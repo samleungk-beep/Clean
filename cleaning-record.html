@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>清潔進度記錄表</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 微軟正黑體, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            color: #2c6eec;
+            margin-bottom: 10px;
+        }
+        .project-info {
+            color: #666;
+            font-size: 1.1em;
+        }
+        .card {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .card-header {
+            border-bottom: 2px solid #f1f1f1;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .card-header h2 {
+            color: #333;
+            font-size: 1.3em;
+            display: flex;
+            align-items: center;
+        }
+        .card-header h2 i {
+            margin-right: 10px;
+            color: #2c6eec;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #2c6eec;
+            box-shadow: 0 0 0 2px rgba(44, 110, 236, 0.2);
+        }
+        .area-inputs {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        @media (max-width: 576px) {
+            .area-inputs {
+                grid-template-columns: 1fr;
+            }
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background-color 0.3s;
+        }
+        .btn-primary {
+            background-color: #2c6eec;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #1a56d9;
+        }
+        .btn-danger {
+            background-color: #ff4444;
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #cc0000;
+        }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        .table-container {
+            overflow-x: auto;
+            margin-top: 20px;
+            padding-bottom: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 800px;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+            white-space: nowrap;
+        }
+        th {
+            background-color: #2c6eec;
+            color: white;
+            font-weight: bold;
+        }
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+        .status-badge {
+            padding: 3px 8px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        .status-completed {
+            background-color: #e6f7e6;
+            color: #009900;
+        }
+        .status-in-progress {
+            background-color: #fff3cd;
+            color: #cc9900;
+        }
+        .status-pending {
+            background-color: #ffebee;
+            color: #cc0000;
+        }
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .stat-card {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #2c6eec;
+            margin: 10px 0;
+        }
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+        }
+        .export-btn {
+            margin-top: 15px;
+            text-align: right;
+            padding-top: 10px;
+            border-top: 1px solid #eee;
+        }
+        .search-filter {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .search-filter input, .search-filter select {
+            flex: 1;
+            min-width: 150px;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background-color: white;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 600px;
+            padding: 25px;
+            position: relative;
+        }
+        .close-modal {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            font-size: 1.5em;
+            cursor: pointer;
+            color: #666;
+        }
+        .completion-chart {
+            height: 300px;
+            margin-top: 20px;
+        }
+        .login-modal {
+            display: flex;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-box {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+        }
+        .login-box h2 {
+            margin-bottom: 20px;
+            color: #2c6eec;
+        }
+        .project-list-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        .project-list-item:hover {
+            background-color: #f8f9fa;
+        }
+        .project-list-item.active {
+            background-color: #e3f2fd;
+        }
+        .main-container {
+            display: grid;
+            grid-template-columns: 1fr 1.5fr;
+            gap: 20px;
+        }
+        @media (max-width: 992px) {
+            .main-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- 登入模態框 -->
+    <div class="login-modal" id="loginModal">
+        <div class="login-box">
+            <h2><i class="fas fa-lock"></i> 清潔進度記錄表 - 登入</h2>
+            <div class="form-group">
+                <label for="password">請輸入密碼</label>
+                <input type="password" id="password" placeholder="輸入密碼">
+            </div>
+            <button class="btn btn-primary" onclick="login()" style="width: 100%;">登入</button>
+        </div>
+    </div>
+
+    <!-- 主內容（預設隱藏） -->
+    <div id="mainContent" style="display: none;">
+        <div class="header">
+            <h1><i class="fas fa-building"></i> 清潔進度記錄表</h1>
+            <div class="project-info">
+                <span id="current-project">項目名稱：請設定項目</span> | 
+                <span id="total-area">總清潔面積：0 m²</span> | 
+                <span id="overall-completion">整體完成率：0%</span>
+            </div>
+        </div>
+
+        <!-- 工程管理 -->
+        <div class="card">
+            <div class="card-header">
+                <h2><i class="fas fa-folder-open"></i> 工程管理</h2>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <input type="text" id="newProjectName" placeholder="輸入新工程名稱" style="flex: 1; min-width: 200px;">
+                <button class="btn btn-primary" onclick="createNewProject()"><i class="fas fa-plus"></i> 新建工程</button>
+                <select id="currentProjectSelect" onchange="switchProject()" style="flex: 1; min-width: 200px;">
+                    <option value="">請選擇工程</option>
+                </select>
+                <button class="btn btn-danger" onclick="deleteCurrentProject()"><i class="fas fa-trash"></i> 刪除當前工程</button>
+            </div>
+            <div style="margin-top: 15px;">
+                <h4 style="margin-bottom: 10px;">工程列表（雙擊查看）</h4>
+                <div id="projectList" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; border-radius: 5px;">
+                </div>
+            </div>
+        </div>
+
+        <div class="main-container">
+            <div class="left-column">
+                <div class="card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-cog"></i> 項目基本設定</h2>
+                    </div>
+                    <div class="form-group">
+                        <label for="projectName">項目名稱</label>
+                        <input type="text" id="projectName" placeholder="例如： Yue Wah International Building">
+                    </div>
+                    <div class="form-group">
+                        <label>總清潔面積設定 (m²)</label>
+                        <div class="area-inputs">
+                            <div>
+                                <label for="totalNorth">北向 (Facing N)</label>
+                                <input type="number" id="totalNorth" placeholder="0">
+                            </div>
+                            <div>
+                                <label for="totalEast">東向 (Facing E)</label>
+                                <input type="number" id="totalEast" placeholder="0">
+                            </div>
+                            <div>
+                                <label for="totalSouth">南向 (Facing S)</label>
+                                <input type="number" id="totalSouth" placeholder="0">
+                            </div>
+                            <div>
+                                <label for="totalWest">西向 (Facing W)</label>
+                                <input type="number" id="totalWest" placeholder="0">
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="saveProjectSettings()"><i class="fas fa-save"></i> 儲存項目設定</button>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-plus-circle"></i> 新增清潔記錄</h2>
+                    </div>
+                    <div class="form-group">
+                        <label for="recordDate">記錄日期</label>
+                        <input type="date" id="recordDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label>當日清潔面積 (div>
+                                <label for="areaNorth">北向 (Facing N)</label>
+                                <input type="number" id="areaNorth" placeholder="0" min="0" step="0.1">
+                            </div>
+                            <div>
+                                <label for="areaEast">東向 (Facing E)</label>
+                                <input type="number" id="areaEast" placeholder="0" min="0" step="0.1">
+                            </div>
+                            <div>
+                                <label for="areaSouth">南向 (Facing S)</label>
+                                <input type="number" id="areaSouth" placeholder="0" min="0" step="0.1">
+                            </div>
+                            <div>
+                                <label for="areaWest">西向 (Facing W)</label>
+                                <input type="number" id="areaWest" placeholder="0" min="0" step="0.1">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="cleaningAgent">清潔劑使用量</label>
+                        <input type="number" id="cleaningAgent" placeholder="0" min="0" step="0.1">
+                        <small>單位：L (公升) 或 kg (公斤)</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="cleaningStaff">負責人員</label>
+                        <input type="text" id="cleaningStaff" placeholder="輸入負責清潔人員姓名">
+                    </div>
+                    <div class="form-group">
+                        <label for="workStatus">工作狀態</label>
+                        <select id="workStatus" required>
+                            <option value="pending">待開始</option>
+                            <option value="in-progress" selected>進行中</option>
+                            <option value="completed">已完成</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="remark">備註</label>
+                        <textarea id="remark" rows="3" placeholder="輸入特殊情況、注意事項等"></textarea>
+                    </div>
+                    <button class="btn btn-primary" onclick="addCleaningRecord()"><i class="fas fa-check"></i> 新增記錄</button>
+                </div>
+            </div>
+
+            <div class="right-column">
+                <div class="card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-chart-pie"></i> 清潔進度統計</h2>
+                    </div>
+                    <div class="summary-stats">
+                        <div class="stat-card">
+                            <div class="stat-label">已完成面積</div>
+                            <div class="stat-value" id="completedArea">0 m²</div>
+                            <div class="stat-label">總面積：<span id="totalAreaDisplay">0 m²</span></div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">完成率</div>
+                            <div class="stat-value" id="completionRate">0%</div>
+                            <div class="stat-label">按總面積計算</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">總清潔劑用量</div>
+                            <div class="stat-value" id="totalCleaningAgent">0 L/kg</div>
+                            <div class="stat-label">所有記錄累計</div>
+                        </div>
+                    </div>
+                    <div class="completion-chart">
+                        <canvas id="completionChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2><i class="fas fa-list-alt"></i> 清潔記錄列表</h2>
+                    </div>
+                    <div class="search-filter">
+                        <input type="text" id="searchRecords" placeholder="搜尋記錄...">
+                        <select id="filterStatus" onchange="filterRecords()">
+                            <option value="all">所有狀態</option>
+                            <option value="pending">待開始</option>
+                            <option value="in-progress">進行中</option>
+                            <option value="completed">已完成</option>
+                        </select>
+                        <select id="filterMonth" onchange="filterRecords()">
+                            <option value="all">所有月份</option>
+                        </select>
+                    </div>
+                    <div class="table-container">
+                        <table id="cleaningRecordsTable">
+                            <thead>
+                                <tr>
+                                    <th>日期</th>
+                                    <th>北向 (m²)</th>
+                                    <th>東向 (m²)</th>
+                                    <th>南向 (m²)</th>
+                                    <th>西向 (m²)</th>
+                                    <th>清潔劑</th>
+                                    <th>負責人</th>
+                                    <th>狀態</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recordsTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="export-btn">
+                        <button class="btn btn-primary" onclick="exportToExcel()"><i class="fas fa-file-excel"></i> 匯出Excel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 登入邏輯
+        const CORRECT_PASSWORD = "Clean2025";
+        function login() {
+            const inputPassword = document.getElementById('password').value;
+            if (inputPassword === CORRECT_PASSWORD) {
+                document.getElementById('loginModal').style.display = 'none';
+                document.getElementById('mainContent').style.display = 'block';
+                initApp();
+            } else {
+                alert('密碼錯誤，請重新輸入！');
+            }
+        }
+
+        // 應用初始化
+        let allProjects = JSON.parse(localStorage.getItem('allProjects')) || {};
+        let currentProjectId = localStorage.getItem('currentProjectId') || null;
+        let cleaningRecords = [];
+        let projectSettings = {};
+        let completionChart;
+
+        function initApp() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('recordDate').value = today;
+            initProjectList();
+            if (currentProjectId && allProjects[currentProjectId]) {
+                loadProjectData(currentProjectId);
+            }
+        }
+
+        // 工程管理函數
+        function createNewProject() {
+            const projectName = document.getElementById('newProjectName').value.trim();
+            if (!projectName) { alert('請輸入工程名稱！'); return; }
+            const projectId = Date.now().toString();
+            allProjects[projectId] = {
+                name: projectName,
+                settings: { name: projectName, totalAreas: { north: 0, east: 0, south: 0, west: 0 } },
+                records: []
+            };
+            localStorage.setItem('allProjects', JSON.stringify(allProjects));
+            document.getElementById('newProjectName').value = '';
+            initProjectList();
+            switchToProject(projectId);
+            alert(`新工程「${projectName}」已創建！`);
+        }
+
+        function switchToProject(projectId) {
+            currentProjectId = projectId;
+            localStorage.setItem('currentProjectId', projectId);
+            loadProjectData(projectId);
+            initProjectList();
+        }
+
+        function loadProjectData(projectId) {
+            const project = allProjects[projectId];
+            if (!project) return;
+            projectSettings = project.settings;
+            cleaningRecords = project.records;
+            loadProjectSettings();
+            loadCleaningRecords();
+            generateMonthFilter();
+            initCompletionChart();
+            updateStatistics();
+        }
+
+        function switchProject() {
+            const projectId = document.getElementById('currentProjectSelect').value;
+            if (projectId) switchToProject(projectId);
+        }
+
+        function deleteCurrentProject() {
+            if (!currentProjectId) { alert('請先選擇要刪除的工程！'); return; }
+            const project = allProjects[currentProjectId];
+            if (!confirm(`確定要刪除工程「${project.name}」嗎？此操作將永久刪除所有相關記錄！`)) return;
+            delete allProjects[currentProjectId];
+            localStorage.setItem('allProjects', JSON.stringify(allProjects));
+            currentProjectId = null;
+            localStorage.removeItem('currentProjectId');
+            cleaningRecords = [];
+            projectSettings = {};
+            loadCleaningRecords();
+            initProjectList();
+            updateStatistics();
+        }
+
+        function initProjectList() {
+            const select = document.getElementById('currentProjectSelect');
+            const list = document.getElementById('projectList');
+            select.innerHTML = '<option value="">請選擇工程</option>';
+            list.innerHTML = '';
+            if (Object.keys(allProjects).length === 0) {
+                list.innerHTML = '<div style="padding: 10px; text-align: center; color: #999;">暫無工程，請新建工程</div>';
+                return;
+            }
+            Object.entries(allProjects).forEach(([id, project]) => {
+                const option = document.createElement('option');
+                option.value = id;
+                option.textContent = project.name;
+                option.selected = id === currentProjectId;
+                select.appendChild(option);
+                const item = document.createElement('div');
+                item.className = 'project-list-item';
+                if (id === currentProjectId) item.classList.add('active');
+                item.innerHTML = `<strong>${project.name}</strong><span style="float: right; color: #666;">${project.records.length} 條記錄</span>`;
+                item.ondblclick = () => switchToProject(id);
+                list.appendChild(item);
+            });
+        }
+
+        function saveCurrentProjectData() {
+            if (!currentProjectId) { alert('請先選擇或新建工程！'); return; }
+            allProjects[currentProjectId].settings = projectSettings;
+            allProjects[currentProjectId].records = cleaningRecords;
+            localStorage.setItem('allProjects', JSON.stringify(allProjects));
+        }
+
+        // 項目設定函數
+        function saveProjectSettings() {
+            const projectName = document.getElementById('projectName').value;
+            const totalNorth = parseFloat(document.getElementById('totalNorth').value) || 0;
+            const totalEast = parseFloat(document.getElementById('totalEast').value) || 0;
+            const totalSouth = parseFloat(document.getElementById('totalSouth').value) || 0;
+            const totalWest = parseFloat(document.getElementById('totalWest').value) || 0;
+            projectSettings = {
+                name: projectName,
+                totalAreas: { north: totalNorth, east: totalEast, south: totalSouth, west: totalWest }
+            };
+            saveCurrentProjectData();
+            loadProjectSettings();
+            updateStatistics();
+            initCompletionChart();
+            alert('項目設定已儲存！');
+        }
+
+        function loadProjectSettings() {
+            if (!projectSettings) return;
+            document.getElementById('projectName').value = projectSettings.name || '';
+            document.getElementById('totalNorth').value = projectSettings.totalAreas.north || 0;
+            document.getElementById('totalEast').value = projectSettings.totalAreas.east || 0;
+            document.getElementById('totalSouth').value = projectSettings.totalAreas.south || 0;
+            document.getElementById('totalWest').value = projectSettings.totalAreas.west || 0;
+            document.getElementById('current-project').textContent = `項目名稱：${projectSettings.name || '未設定'}`;
+            const totalArea = calculateTotalArea();
+            document.getElementById('total-area').textContent = `總清潔面積：${totalArea} m²`;
+            document.getElementById('totalAreaDisplay').textContent = `${totalArea} m²`;
+        }
+
+        // 清潔記錄函數
+        function addCleaningRecord() {
+            const recordDate = document.getElementById('recordDate').value;
+            const areaNorth = parseFloat(document.getElementById('areaNorth').value) || 0;
+            const areaEast = parseFloat(document.getElementById('areaEast').value) || 0;
+            const areaSouth = parseFloat(document.getElementById('areaSouth').value) || 0;
+            const areaWest = parseFloat(document.getElementById('areaWest').value) || 0;
+            const cleaningAgent = parseFloat(document.getElementById('cleaningAgent').value) || 0;
+            const cleaningStaff = document.getElementById('cleaningStaff').value;
+            const workStatus = document.getElementById('workStatus').value;
+            const remark = document.getElementById('remark').value;
+            if (!recordDate) { alert('請選擇記錄日期！'); return; }
+            const existingRecord = cleaningRecords.find(record => record.date === recordDate);
+            if (existingRecord) {
+                if (!confirm('當天已有記錄，是否要覆蓋？')) return;
+                cleaningRecords = cleaningRecords.filter(record => record.date !== recordDate);
+            }
+            const newRecord = {
+                id: Date.now().toString(),
+                date: recordDate,
+                areas: { north: areaNorth, east: areaEast, south: areaSouth, west: areaWest },
+                cleaningAgent: cleaningAgent,
+                staff: cleaningStaff,
+                status: workStatus,
+                remark: remark,
+                createdAt: new Date().toISOString()
+            };
+            cleaningRecords.push(newRecord);
+            cleaningRecords.sort((a, b) => new Date(b.date) - new Date(a.date));
+            saveCurrentProjectData();
+            document.getElementById('areaNorth').value = '';
+            document.getElementById('areaEast').value = '';
+            document.getElementById('areaSouth').value = '';
+            document.getElementById('areaWest').value = '';
+            document.getElementById('cleaningAgent').value = '';
+            document.getElementById('cleaningStaff').value = '';
+            document.getElementById('workStatus').value = 'in-progress';
+            document.getElementById('remark').value = '';
+            loadCleaningRecords();
+            updateStatistics();
+            initCompletionChart();
+            generateMonthFilter();
+            alert('清潔記錄已新增！');
+        }
+
+        function loadCleaningRecords(filteredRecords = null) {
+            const recordsToDisplay = filteredRecords || cleaningRecords;
+            const tableBody = document.getElementById('recordsTableBody');
+            tableBody.innerHTML = '';
+            if (recordsToDisplay.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 20px;"><i class="fas fa-folder-open" style="font-size: 2em; color: #ccc; margin-bottom: 10px;"></i><br>暂无清潔記錄，請新增記錄</td></tr>`;
+                return;
+            }
+            recordsToDisplay.forEach(record => {
+                const statusBadge = getStatusBadge(record.status);
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${formatDate(record.date)}</td>
+                    <td>${record.areas.north.toFixed(1)}</td>
+                    <td>${record.areas.east.toFixed(1)}</td>
+                    <td>${record.areas.south.toFixed(1)}</td>
+                    <td>${record.areas.west.toFixed(1)}</td>
+                    <td>${record.cleaningAgent.toFixed(1)}</td>
+                    <td>${record.staff || '-'}</td>
+                    <td>${statusBadge}</td>
+                    <td>
+                        <button class="btn btn-primary btn-sm" onclick="editRecord('${record.id}')" style="padding: 5px 10px; margin-right: 5px;"><i class="fas fa-edit"></i> 編輯</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteRecord('${record.id}')" style="padding: 5px 10px;"><i class="fas fa-trash"></i> 刪除</button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+            updateStatistics();
+        }
+
+        function getStatusBadge(status) {
+            switch(status) {
+                case 'completed': return '<span class="status-badge status-completed">已完成</span>';
+                case 'in-progress': return '<span class="status-badge status-in-progress">進行中</span>';
+                case 'pending': return '<span class="status-badge status-pending">待開始</span>';
+                default: return '<span class="status-badge">未知</span>';
+            }
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
+        }
+
+        function calculateTotalArea() {
+            if (!projectSettings || !projectSettings.totalAreas) return 0;
+            const { north, east, south, west } = projectSettings.totalAreas;
+            return (north + east + south + west).toFixed(1);
+        }
+
+        function calculateCompletedArea() {
+            if (cleaningRecords.length === 0) return 0;
+            let completedArea = 0;
+            cleaningRecords.forEach(record => {
+                completedArea += record.areas.north + record.areas.east + record.areas.south + record.areas.west;
+            });
+            return completedArea.toFixed(1);
+        }
+
+        function calculateCompletionRate() {
+            const totalArea = parseFloat(calculateTotalArea());
+            const completedArea = parseFloat(calculateCompletedArea());
+            if (totalArea === 0) return 0;
+            return ((completedArea / totalArea) * 100).toFixed(1);
+        }
+
+        function calculateTotalCleaningAgent() {
+            if (cleaningRecords.length === 0) return 0;
+            let totalAgent = 0;
+            cleaningRecords.forEach(record => { totalAgent += record.cleaningAgent; });
+            return totalAgent.toFixed(1);
+        }
+
+        function updateStatistics() {
+            const completedArea = calculateCompletedArea();
+            const completionRate = calculateCompletionRate();
+            const totalAgent = calculateTotalCleaningAgent();
+            const totalArea = calculateTotalArea();
+            document.getElementById('completedArea').textContent = `${completedArea} m²`;
+            document.getElementById('completionRate').textContent = `${completionRate}%`;
+            document.getElementById('totalCleaningAgent').textContent = `${totalAgent} L/kg`;
+            document.getElementById('overall-completion').textContent = `整體完成率：${completionRate}%`;
+        }
+
+        function initCompletionChart() {
+            const ctx = document.getElementById('completionChart').getContext('2d');
+            if (completionChart) completionChart.destroy();
+            const totalArea = parseFloat(calculateTotalArea());
+            const completedArea = parseFloat(calculateCompletedArea());
+            const remainingArea = (totalArea - completedArea).toFixed(1);
+            let northCompleted = 0, eastCompleted = 0, southCompleted = 0, westCompleted = 0;
+            cleaningRecords.forEach(record => {
+                northCompleted += record.areas.north;
+                eastCompleted += record.areas.east;
+                southCompleted += record.areas.south;
+                westCompleted += record.areas.west;
+            });
+            completionChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['已完成面積', '剩餘面積'],
+                    datasets: [{
+                        data: [completedArea, Math.max(0, remainingArea)],
+                        backgroundColor: ['#2c6eec', '#e0e0e0'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top' },
+                        title: { display: true, text: '整體清潔完成狀況' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.raw || 0;
+                                    const percentage = totalArea > 0 ? ((value / totalArea) * 100).toFixed(1) : 0;
+                                    return `${label}: ${value} m² (${percentage}%)`;
+                                }
+                            }
+                        }
+                    },
+                    cutout: '60%'
+                }
+            });
+        }
+
+        function generateMonthFilter() {
+            const filterMonth = document.getElementById('filterMonth');
+            filterMonth.innerHTML = '<option value="all">所有月份</option>';
+            if (cleaningRecords.length === 0) return;
+            const uniqueMonths = new Set();
+            cleaningRecords.forEach(record => {
+                const date = new Date(record.date);
+                const yearMonth = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+                uniqueMonths.add(yearMonth);
+            });
+            const sortedMonths = Array.from(uniqueMonths).sort((a, b) => new Date(b) - new Date(a));
+            sortedMonths.forEach(month => {
+                const [year, monthNum] = month.split('-');
+                const option = document.createElement('option');
+                option.value = month;
+                option.textContent = `${year}年${monthNum}月`;
+                filterMonth.appendChild(option);
+            });
+        }
+
+        function filterRecords() {
+            const searchTerm = document.getElementById('searchRecords').value.toLowerCase();
+            const statusFilter = document.getElementById('filterStatus').value;
+            const monthFilter = document.getElementById('filterMonth').value;
+            let filtered = cleaningRecords;
+            if (searchTerm) {
+                filtered = filtered.filter(record => {
+                    return record.staff.toLowerCase().includes(searchTerm) ||
+                           record.remark.toLowerCase().includes(searchTerm) ||
+                           formatDate(record.date).includes(searchTerm);
+                });
+            }
+            if (statusFilter !== 'all') {
+                filtered = filtered.filter(record => record.status === statusFilter);
+            }
+            if (monthFilter !== 'all') {
+                const [year, month] = monthFilter.split('-');
+                filtered = filtered.filter(record => {
+                    const date = new Date(record.date);
+                    return date.getFullYear().toString() === year &&
+                           (date.getMonth() + 1).toString().padStart(2, '0') === month;
+                });
+            }
+            loadCleaningRecords(filtered);
+        }
+
+        function editRecord(recordId) {
+            const record = cleaningRecords.find(r => r.id === recordId);
+            if (!record) return;
+            alert('編輯功能已保留，如需使用可告訴我，我幫你補上完整編輯模態框！');
+        }
+
+        function deleteRecord(recordId) {
+            if (!confirm('確定要刪除此記錄嗎？此操作不可撤銷！')) return;
+            cleaningRecords = cleaningRecords.filter(record => record.id !== recordId);
+            saveCurrentProjectData();
+            loadCleaningRecords();
+            updateStatistics();
+            initCompletionChart();
+            generateMonthFilter();
+        }
+
+        function exportToExcel() {
+            alert('匯出Excel出邏輯！');
+        }
+    </script>
+</body>
+</html>
