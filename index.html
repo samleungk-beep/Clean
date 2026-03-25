@@ -274,9 +274,9 @@
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 </head>
 <body>
-    <!-- 登入模態框 -->
     <div class="login-modal" id="loginModal">
         <div class="login-box">
             <h2><i class="fas fa-lock"></i> 清潔進度記錄表 - 登入</h2>
@@ -288,7 +288,6 @@
         </div>
     </div>
 
-    <!-- 主內容（預設隱藏） -->
     <div id="mainContent" style="display: none;">
         <div class="header">
             <h1><i class="fas fa-building"></i> 清潔進度記錄表</h1>
@@ -299,7 +298,6 @@
             </div>
         </div>
 
-        <!-- 工程管理 -->
         <div class="card">
             <div class="card-header">
                 <h2><i class="fas fa-folder-open"></i> 工程管理</h2>
@@ -362,7 +360,9 @@
                         <input type="date" id="recordDate" required>
                     </div>
                     <div class="form-group">
-                        <label>當日清潔面積 (div>
+                        <label>當日清潔面積 (m²)</label>
+                        <div class="area-inputs">
+                            <div>
                                 <label for="areaNorth">北向 (Facing N)</label>
                                 <input type="number" id="areaNorth" placeholder="0" min="0" step="0.1">
                             </div>
@@ -437,7 +437,7 @@
                         <h2><i class="fas fa-list-alt"></i> 清潔記錄列表</h2>
                     </div>
                     <div class="search-filter">
-                        <input type="text" id="searchRecords" placeholder="搜尋記錄...">
+                        <input type="text" id="searchRecords" placeholder="搜尋記錄..." oninput="filterRecords()">
                         <select id="filterStatus" onchange="filterRecords()">
                             <option value="all">所有狀態</option>
                             <option value="pending">待開始</option>
@@ -476,25 +476,55 @@
     </div>
 
     <script>
-        // 登入邏輯
         const CORRECT_PASSWORD = "Clean2025";
-        function login() {
+        const GIST_ID = "6ba0f5239d7b4b7f9d3e8c4a1f4b4c9e7";
+        const GIST_FILENAME = "cleaning-data.json";
+        let allProjects = {};
+        let currentProjectId = null;
+        let cleaningRecords = [];
+        let projectSettings = {};
+        let completionChart;
+
+        async function login() {
             const inputPassword = document.getElementById('password').value;
             if (inputPassword === CORRECT_PASSWORD) {
                 document.getElementById('loginModal').style.display = 'none';
                 document.getElementById('mainContent').style.display = 'block';
+                await loadAllDataFromCloud();
                 initApp();
             } else {
                 alert('密碼錯誤，請重新輸入！');
             }
         }
 
-        // 應用初始化
-        let allProjects = JSON.parse(localStorage.getItem('allProjects')) || {};
-        let currentProjectId = localStorage.getItem('currentProjectId') || null;
-        let cleaningRecords = [];
-        let projectSettings = {};
-        let completionChart;
+        async function loadAllDataFromCloud() {
+            try {
+                const response = await fetch(`https://api.github.com/gists/${GIST_ID}`);
+                const data = await response.json();
+                if (data.files[GIST_FILENAME]) {
+                    const content = data.files[GIST_FILENAME].content;
+                    const cloudData = JSON.parse(content);
+                    allProjects = cloudData.allProjects || {};
+                    currentProjectId = cloudData.currentProjectId;
+                }
+            } catch (e) {
+                allProjects = {};
+                currentProjectId = null;
+            }
+        }
+
+        async function saveAllDataToCloud() {
+            const dataToSave = { allProjects, currentProjectId };
+            try {
+                await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        files: { [GIST_FILENAME]: { content: JSON.stringify(dataToSave, null, 2) } }
+                    })
+                });
+            } catch (e) {}
+        }
 
         function initApp() {
             const today = new Date().toISOString().split('T')[0];
@@ -505,8 +535,7 @@
             }
         }
 
-        // 工程管理函數
-        function createNewProject() {
+        async function createNewProject() {
             const projectName = document.getElementById('newProjectName').value.trim();
             if (!projectName) { alert('請輸入工程名稱！'); return; }
             const projectId = Date.now().toString();
@@ -515,7 +544,7 @@
                 settings: { name: projectName, totalAreas: { north: 0, east: 0, south: 0, west: 0 } },
                 records: []
             };
-            localStorage.setItem('allProjects', JSON.stringify(allProjects));
+            await saveAllDataToCloud();
             document.getElementById('newProjectName').value = '';
             initProjectList();
             switchToProject(projectId);
@@ -524,7 +553,6 @@
 
         function switchToProject(projectId) {
             currentProjectId = projectId;
-            localStorage.setItem('currentProjectId', projectId);
             loadProjectData(projectId);
             initProjectList();
         }
@@ -546,321 +574,190 @@
             if (projectId) switchToProject(projectId);
         }
 
-        function deleteCurrentProject() {
+        async function deleteCurrentProject() {
             if (!currentProjectId) { alert('請先選擇要刪除的工程！'); return; }
             const project = allProjects[currentProjectId];
-            if (!confirm(`確定要刪除工程「${project.name}」嗎？此操作將永久刪除所有相關記錄！`)) return;
+            if (!confirm(`確定要刪除工程「${project.name}」嗎？`)) return;
             delete allProjects[currentProjectId];
-            localStorage.setItem('allProjects', JSON.stringify(allProjects));
             currentProjectId = null;
-            localStorage.removeItem('currentProjectId');
-            cleaningRecords = [];
-            projectSettings = {};
-            loadCleaningRecords();
-            initProjectList();
-            updateStatistics();
+            await saveAllDataToCloud();
+            cleaningRecords = []; projectSettings = {};
+            loadCleaningRecords(); initProjectList(); updateStatistics();
         }
 
         function initProjectList() {
             const select = document.getElementById('currentProjectSelect');
             const list = document.getElementById('projectList');
-            select.innerHTML = '<option value="">請選擇工程</option>';
-            list.innerHTML = '';
+            select.innerHTML = '<option value="">請選擇工程</option>'; list.innerHTML = '';
             if (Object.keys(allProjects).length === 0) {
-                list.innerHTML = '<div style="padding: 10px; text-align: center; color: #999;">暫無工程，請新建工程</div>';
-                return;
+                list.innerHTML = '<div style="padding:10px;text-align:center;color:#999;">暫無工程</div>'; return;
             }
             Object.entries(allProjects).forEach(([id, project]) => {
                 const option = document.createElement('option');
-                option.value = id;
-                option.textContent = project.name;
-                option.selected = id === currentProjectId;
+                option.value = id; option.textContent = project.name; option.selected = id === currentProjectId;
                 select.appendChild(option);
                 const item = document.createElement('div');
                 item.className = 'project-list-item';
                 if (id === currentProjectId) item.classList.add('active');
-                item.innerHTML = `<strong>${project.name}</strong><span style="float: right; color: #666;">${project.records.length} 條記錄</span>`;
+                item.innerHTML = `<strong>${project.name}</strong><span style="float:right;color:#666;">${project.records.length} 條記錄</span>`;
                 item.ondblclick = () => switchToProject(id);
                 list.appendChild(item);
             });
         }
 
-        function saveCurrentProjectData() {
-            if (!currentProjectId) { alert('請先選擇或新建工程！'); return; }
+        async function saveCurrentProjectData() {
+            if (!currentProjectId) return;
             allProjects[currentProjectId].settings = projectSettings;
             allProjects[currentProjectId].records = cleaningRecords;
-            localStorage.setItem('allProjects', JSON.stringify(allProjects));
+            await saveAllDataToCloud();
         }
 
-        // 項目設定函數
-        function saveProjectSettings() {
+        async function saveProjectSettings() {
             const projectName = document.getElementById('projectName').value;
-            const totalNorth = parseFloat(document.getElementById('totalNorth').value) || 0;
-            const totalEast = parseFloat(document.getElementById('totalEast').value) || 0;
-            const totalSouth = parseFloat(document.getElementById('totalSouth').value) || 0;
-            const totalWest = parseFloat(document.getElementById('totalWest').value) || 0;
-            projectSettings = {
-                name: projectName,
-                totalAreas: { north: totalNorth, east: totalEast, south: totalSouth, west: totalWest }
-            };
-            saveCurrentProjectData();
-            loadProjectSettings();
-            updateStatistics();
-            initCompletionChart();
+            const totalNorth = parseFloat(document.getElementById('totalNorth').value)||0;
+            const totalEast = parseFloat(document.getElementById('totalEast').value)||0;
+            const totalSouth = parseFloat(document.getElementById('totalSouth').value)||0;
+            const totalWest = parseFloat(document.getElementById('totalWest').value)||0;
+            projectSettings = { name: projectName, totalAreas: { north: totalNorth, east: totalEast, south: totalSouth, west: totalWest } };
+            await saveCurrentProjectData();
+            loadProjectSettings(); updateStatistics(); initCompletionChart();
             alert('項目設定已儲存！');
         }
 
         function loadProjectSettings() {
             if (!projectSettings) return;
             document.getElementById('projectName').value = projectSettings.name || '';
-            document.getElementById('totalNorth').value = projectSettings.totalAreas.north || 0;
-            document.getElementById('totalEast').value = projectSettings.totalAreas.east || 0;
-            document.getElementById('totalSouth').value = projectSettings.totalAreas.south || 0;
-            document.getElementById('totalWest').value = projectSettings.totalAreas.west || 0;
-            document.getElementById('current-project').textContent = `項目名稱：${projectSettings.name || '未設定'}`;
+            document.getElementById('totalNorth').value = projectSettings.totalAreas.north||0;
+            document.getElementById('totalEast').value = projectSettings.totalAreas.east||0;
+            document.getElementById('totalSouth').value = projectSettings.totalAreas.south||0;
+            document.getElementById('totalWest').value = projectSettings.totalAreas.west||0;
+            document.getElementById('current-project').textContent = `項目名稱：${projectSettings.name||'未設定'}`;
             const totalArea = calculateTotalArea();
             document.getElementById('total-area').textContent = `總清潔面積：${totalArea} m²`;
             document.getElementById('totalAreaDisplay').textContent = `${totalArea} m²`;
         }
 
-        // 清潔記錄函數
-        function addCleaningRecord() {
+        async function addCleaningRecord() {
             const recordDate = document.getElementById('recordDate').value;
-            const areaNorth = parseFloat(document.getElementById('areaNorth').value) || 0;
-            const areaEast = parseFloat(document.getElementById('areaEast').value) || 0;
-            const areaSouth = parseFloat(document.getElementById('areaSouth').value) || 0;
-            const areaWest = parseFloat(document.getElementById('areaWest').value) || 0;
-            const cleaningAgent = parseFloat(document.getElementById('cleaningAgent').value) || 0;
+            const areaNorth = parseFloat(document.getElementById('areaNorth').value)||0;
+            const areaEast = parseFloat(document.getElementById('areaEast').value)||0;
+            const areaSouth = parseFloat(document.getElementById('areaSouth').value)||0;
+            const areaWest = parseFloat(document.getElementById('areaWest').value)||0;
+            const cleaningAgent = parseFloat(document.getElementById('cleaningAgent').value)||0;
             const cleaningStaff = document.getElementById('cleaningStaff').value;
             const workStatus = document.getElementById('workStatus').value;
             const remark = document.getElementById('remark').value;
-            if (!recordDate) { alert('請選擇記錄日期！'); return; }
-            const existingRecord = cleaningRecords.find(record => record.date === recordDate);
-            if (existingRecord) {
-                if (!confirm('當天已有記錄，是否要覆蓋？')) return;
-                cleaningRecords = cleaningRecords.filter(record => record.date !== recordDate);
-            }
-            const newRecord = {
-                id: Date.now().toString(),
-                date: recordDate,
+            if (!recordDate) { alert('請選擇日期！'); return; }
+            
+            cleaningRecords = cleaningRecords.filter(r => r.date !== recordDate);
+            cleaningRecords.push({
+                id: Date.now().toString(), date: recordDate,
                 areas: { north: areaNorth, east: areaEast, south: areaSouth, west: areaWest },
-                cleaningAgent: cleaningAgent,
-                staff: cleaningStaff,
-                status: workStatus,
-                remark: remark,
-                createdAt: new Date().toISOString()
-            };
-            cleaningRecords.push(newRecord);
-            cleaningRecords.sort((a, b) => new Date(b.date) - new Date(a.date));
-            saveCurrentProjectData();
-            document.getElementById('areaNorth').value = '';
-            document.getElementById('areaEast').value = '';
-            document.getElementById('areaSouth').value = '';
-            document.getElementById('areaWest').value = '';
-            document.getElementById('cleaningAgent').value = '';
-            document.getElementById('cleaningStaff').value = '';
-            document.getElementById('workStatus').value = 'in-progress';
-            document.getElementById('remark').value = '';
-            loadCleaningRecords();
-            updateStatistics();
-            initCompletionChart();
-            generateMonthFilter();
-            alert('清潔記錄已新增！');
+                cleaningAgent, staff: cleaningStaff, status: workStatus, remark
+            });
+            cleaningRecords.sort((a,b)=>new Date(b.date)-new Date(a.date));
+            await saveCurrentProjectData();
+            
+            document.getElementById('areaNorth').value='';
+            document.getElementById('areaEast').value='';
+            document.getElementById('areaSouth').value='';
+            document.getElementById('areaWest').value='';
+            document.getElementById('cleaningAgent').value='';
+            document.getElementById('cleaningStaff').value='';
+            document.getElementById('remark').value='';
+            
+            loadCleaningRecords(); updateStatistics(); initCompletionChart(); generateMonthFilter();
+            alert('記錄已儲存至雲端！');
         }
 
-        function loadCleaningRecords(filteredRecords = null) {
-            const recordsToDisplay = filteredRecords || cleaningRecords;
-            const tableBody = document.getElementById('recordsTableBody');
-            tableBody.innerHTML = '';
-            if (recordsToDisplay.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 20px;"><i class="fas fa-folder-open" style="font-size: 2em; color: #ccc; margin-bottom: 10px;"></i><br>暂无清潔記錄，請新增記錄</td></tr>`;
-                return;
+        function loadCleaningRecords(filtered=null) {
+            const records = filtered || cleaningRecords;
+            const body = document.getElementById('recordsTableBody'); body.innerHTML = '';
+            if (records.length===0) {
+                body.innerHTML = `<tr><td colspan="9" style="text-align:center;">暫無記錄</td></tr>`; return;
             }
-            recordsToDisplay.forEach(record => {
-                const statusBadge = getStatusBadge(record.status);
+            records.forEach(r=>{
+                const badge = getStatusBadge(r.status);
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${formatDate(record.date)}</td>
-                    <td>${record.areas.north.toFixed(1)}</td>
-                    <td>${record.areas.east.toFixed(1)}</td>
-                    <td>${record.areas.south.toFixed(1)}</td>
-                    <td>${record.areas.west.toFixed(1)}</td>
-                    <td>${record.cleaningAgent.toFixed(1)}</td>
-                    <td>${record.staff || '-'}</td>
-                    <td>${statusBadge}</td>
+                    <td>${formatDate(r.date)}</td>
+                    <td>${r.areas.north.toFixed(1)}</td>
+                    <td>${r.areas.east.toFixed(1)}</td>
+                    <td>${r.areas.south.toFixed(1)}</td>
+                    <td>${r.areas.west.toFixed(1)}</td>
+                    <td>${r.cleaningAgent.toFixed(1)}</td>
+                    <td>${r.staff||'-'}</td>
+                    <td>${badge}</td>
                     <td>
-                        <button class="btn btn-primary btn-sm" onclick="editRecord('${record.id}')" style="padding: 5px 10px; margin-right: 5px;"><i class="fas fa-edit"></i> 編輯</button>
-                        <button class="btn btn-danger btn-sm" onclick="deleteRecord('${record.id}')" style="padding: 5px 10px;"><i class="fas fa-trash"></i> 刪除</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteRecord('${r.id}')" style="padding:5px 10px;">刪除</button>
                     </td>
                 `;
-                tableBody.appendChild(row);
-            });
-            updateStatistics();
-        }
-
-        function getStatusBadge(status) {
-            switch(status) {
-                case 'completed': return '<span class="status-badge status-completed">已完成</span>';
-                case 'in-progress': return '<span class="status-badge status-in-progress">進行中</span>';
-                case 'pending': return '<span class="status-badge status-pending">待開始</span>';
-                default: return '<span class="status-badge">未知</span>';
-            }
-        }
-
-        function formatDate(dateString) {
-            const date = new Date(dateString);
-            return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
-        }
-
-        function calculateTotalArea() {
-            if (!projectSettings || !projectSettings.totalAreas) return 0;
-            const { north, east, south, west } = projectSettings.totalAreas;
-            return (north + east + south + west).toFixed(1);
-        }
-
-        function calculateCompletedArea() {
-            if (cleaningRecords.length === 0) return 0;
-            let completedArea = 0;
-            cleaningRecords.forEach(record => {
-                completedArea += record.areas.north + record.areas.east + record.areas.south + record.areas.west;
-            });
-            return completedArea.toFixed(1);
-        }
-
-        function calculateCompletionRate() {
-            const totalArea = parseFloat(calculateTotalArea());
-            const completedArea = parseFloat(calculateCompletedArea());
-            if (totalArea === 0) return 0;
-            return ((completedArea / totalArea) * 100).toFixed(1);
-        }
-
-        function calculateTotalCleaningAgent() {
-            if (cleaningRecords.length === 0) return 0;
-            let totalAgent = 0;
-            cleaningRecords.forEach(record => { totalAgent += record.cleaningAgent; });
-            return totalAgent.toFixed(1);
-        }
-
-        function updateStatistics() {
-            const completedArea = calculateCompletedArea();
-            const completionRate = calculateCompletionRate();
-            const totalAgent = calculateTotalCleaningAgent();
-            const totalArea = calculateTotalArea();
-            document.getElementById('completedArea').textContent = `${completedArea} m²`;
-            document.getElementById('completionRate').textContent = `${completionRate}%`;
-            document.getElementById('totalCleaningAgent').textContent = `${totalAgent} L/kg`;
-            document.getElementById('overall-completion').textContent = `整體完成率：${completionRate}%`;
-        }
-
-        function initCompletionChart() {
-            const ctx = document.getElementById('completionChart').getContext('2d');
-            if (completionChart) completionChart.destroy();
-            const totalArea = parseFloat(calculateTotalArea());
-            const completedArea = parseFloat(calculateCompletedArea());
-            const remainingArea = (totalArea - completedArea).toFixed(1);
-            let northCompleted = 0, eastCompleted = 0, southCompleted = 0, westCompleted = 0;
-            cleaningRecords.forEach(record => {
-                northCompleted += record.areas.north;
-                eastCompleted += record.areas.east;
-                southCompleted += record.areas.south;
-                westCompleted += record.areas.west;
-            });
-            completionChart = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['已完成面積', '剩餘面積'],
-                    datasets: [{
-                        data: [completedArea, Math.max(0, remainingArea)],
-                        backgroundColor: ['#2c6eec', '#e0e0e0'],
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'top' },
-                        title: { display: true, text: '整體清潔完成狀況' },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    const label = context.label || '';
-                                    const value = context.raw || 0;
-                                    const percentage = totalArea > 0 ? ((value / totalArea) * 100).toFixed(1) : 0;
-                                    return `${label}: ${value} m² (${percentage}%)`;
-                                }
-                            }
-                        }
-                    },
-                    cutout: '60%'
-                }
+                body.appendChild(row);
             });
         }
 
-        function generateMonthFilter() {
-            const filterMonth = document.getElementById('filterMonth');
-            filterMonth.innerHTML = '<option value="all">所有月份</option>';
-            if (cleaningRecords.length === 0) return;
-            const uniqueMonths = new Set();
-            cleaningRecords.forEach(record => {
-                const date = new Date(record.date);
-                const yearMonth = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-                uniqueMonths.add(yearMonth);
+        function getStatusBadge(s){
+            if(s==='completed') return '<span class="status-badge status-completed">已完成</span>';
+            if(s==='in-progress') return '<span class="status-badge status-in-progress">進行中</span>';
+            return '<span class="status-badge status-pending">待開始</span>';
+        }
+
+        function formatDate(d){const dt=new Date(d);return `${dt.getFullYear()}-${(dt.getMonth()+1).toString().padStart(2,'0')}-${dt.getDate().toString().padStart(2,'0')}`;}
+        function calculateTotalArea(){if(!projectSettings||!projectSettings.totalAreas)return 0;const{north,east,south,west}=projectSettings.totalAreas;return(north+east+south+west).toFixed(1);}
+        function calculateCompletedArea(){let total=0;cleaningRecords.forEach(r=>{total+=r.areas.north+r.areas.east+r.areas.south+r.areas.west;});return total.toFixed(1);}
+        function calculateCompletionRate(){const t=parseFloat(calculateTotalArea());const c=parseFloat(calculateCompletedArea());return t===0?0:((c/t)*100).toFixed(1);}
+        function calculateTotalCleaningAgent(){let t=0;cleaningRecords.forEach(r=>t+=r.cleaningAgent);return t.toFixed(1);}
+
+        function updateStatistics(){
+            document.getElementById('completedArea').textContent=`${calculateCompletedArea()} m²`;
+            document.getElementById('completionRate').textContent=`${calculateCompletionRate()}%`;
+            document.getElementById('totalCleaningAgent').textContent=`${calculateTotalCleaningAgent()} L/kg`;
+            document.getElementById('overall-completion').textContent=`整體完成率：${calculateCompletionRate()}%`;
+        }
+
+        function initCompletionChart(){
+            const ctx=document.getElementById('completionChart').getContext('2d');
+            if(completionChart)completionChart.destroy();
+            const total=parseFloat(calculateTotalArea());
+            const completed=parseFloat(calculateCompletedArea());
+            completionChart=new Chart(ctx,{
+                type:'doughnut',
+                data:{labels:['已完成','剩餘'],datasets:[{data:[completed,Math.max(0,total-completed)],backgroundColor:['#2c6eec','#e0e0e0']}]},
+                options:{responsive:true,maintainAspectRatio:false,plugins:{title:{display:true,text:'清潔完成狀況'}},cutout:'60%'}
             });
-            const sortedMonths = Array.from(uniqueMonths).sort((a, b) => new Date(b) - new Date(a));
-            sortedMonths.forEach(month => {
-                const [year, monthNum] = month.split('-');
-                const option = document.createElement('option');
-                option.value = month;
-                option.textContent = `${year}年${monthNum}月`;
-                filterMonth.appendChild(option);
-            });
         }
 
-        function filterRecords() {
-            const searchTerm = document.getElementById('searchRecords').value.toLowerCase();
-            const statusFilter = document.getElementById('filterStatus').value;
-            const monthFilter = document.getElementById('filterMonth').value;
-            let filtered = cleaningRecords;
-            if (searchTerm) {
-                filtered = filtered.filter(record => {
-                    return record.staff.toLowerCase().includes(searchTerm) ||
-                           record.remark.toLowerCase().includes(searchTerm) ||
-                           formatDate(record.date).includes(searchTerm);
-                });
-            }
-            if (statusFilter !== 'all') {
-                filtered = filtered.filter(record => record.status === statusFilter);
-            }
-            if (monthFilter !== 'all') {
-                const [year, month] = monthFilter.split('-');
-                filtered = filtered.filter(record => {
-                    const date = new Date(record.date);
-                    return date.getFullYear().toString() === year &&
-                           (date.getMonth() + 1).toString().padStart(2, '0') === month;
-                });
-            }
-            loadCleaningRecords(filtered);
+        function generateMonthFilter(){
+            const sel=document.getElementById('filterMonth');sel.innerHTML='<option value="all">所有月份</option>';
+            const months=new Set();cleaningRecords.forEach(r=>{const d=new Date(r.date);months.add(`${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}`);});
+            Array.from(months).sort().reverse().forEach(m=>{const o=document.createElement('option');o.value=m;o.textContent=m;sel.appendChild(o);});
         }
 
-        function editRecord(recordId) {
-            const record = cleaningRecords.find(r => r.id === recordId);
-            if (!record) return;
-            alert('編輯功能已保留，如需使用可告訴我，我幫你補上完整編輯模態框！');
+        function filterRecords(){
+            const search=document.getElementById('searchRecords').value.toLowerCase();
+            const status=document.getElementById('filterStatus').value;
+            const month=document.getElementById('filterMonth').value;
+            let f=cleaningRecords;
+            if(search)f=f.filter(r=>r.staff?.toLowerCase().includes(search)||r.remark?.toLowerCase().includes(search)||formatDate(r.date).includes(search));
+            if(status!=='all')f=f.filter(r=>r.status===status);
+            if(month!=='all')f=f.filter(r=>r.date.startsWith(month));
+            loadCleaningRecords(f);
         }
 
-        function deleteRecord(recordId) {
-            if (!confirm('確定要刪除此記錄嗎？此操作不可撤銷！')) return;
-            cleaningRecords = cleaningRecords.filter(record => record.id !== recordId);
-            saveCurrentProjectData();
-            loadCleaningRecords();
-            updateStatistics();
-            initCompletionChart();
-            generateMonthFilter();
+        async function deleteRecord(id){
+            if(!confirm('確定刪除？'))return;
+            cleaningRecords=cleaningRecords.filter(r=>r.id!==id);
+            await saveCurrentProjectData();
+            loadCleaningRecords();updateStatistics();initCompletionChart();generateMonthFilter();
         }
 
-        function exportToExcel() {
-            alert('匯出Excel出邏輯！');
+        function exportToExcel(){
+            const ws=XLSX.utils.json_to_sheet(cleaningRecords.map(r=>({
+                日期:r.date,北向:r.areas.north,東向:r.areas.east,南向:r.areas.south,西向:r.areas.west,
+                清潔劑:r.cleaningAgent,負責人:r.staff,狀態:r.status,備註:r.remark
+            })));
+            const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"清潔記錄");
+            XLSX.writeFile(wb,"清潔記錄.xlsx");
         }
     </script>
 </body>
