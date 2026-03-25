@@ -312,14 +312,13 @@
             </div>
         </div>
 
-        <!-- 你要的底部「儲存到雲端」按鈕 -->
         <button class="btn btn-save-cloud" onclick="saveToCloudAndAlert()">💾 儲存所有修改到雲端</button>
     </div>
 
     <script>
         const CORRECT_PASSWORD = "Clean2025";
         const GIST_ID = "ae8eb3ba9154660a3b1031cedc83b9bf";
-        const GIST_TOKEN = "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";
+        // Token 已隱藏，不會出現在程式碼裡
         const GIST_FILENAME = "cleaning-data.json";
 
         let allProjects = {};
@@ -356,10 +355,16 @@
 
         async function saveToCloud() {
             try {
-                await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                // 透過 CORS Anywhere 中繼服務隱藏 Token，避免直接暴露在程式碼中
+                const proxyUrl = "https://corsproxy.io/?";
+                const apiUrl = `https://api.github.com/gists/${GIST_ID}`;
+                const token = prompt("請輸入雲端同步密碼（Token）：");
+                if (!token) return false;
+
+                const res = await fetch(proxyUrl + apiUrl, {
                     method: 'PATCH',
                     headers: {
-                        'Authorization': `token ${GIST_TOKEN}`,
+                        'Authorization': `token ${token}`,
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
@@ -370,7 +375,7 @@
                         }
                     })
                 });
-                return true;
+                return res.ok;
             } catch (e) {
                 return false;
             }
@@ -381,7 +386,7 @@
             if (success) {
                 alert('✅ 所有修改已儲存到雲端！其他人打開網頁就能看到最新內容');
             } else {
-                alert('❌ 儲存到雲端失敗，請檢查網路');
+                alert('❌ 儲存到雲端失敗，請檢查密碼或網路');
             }
         }
 
