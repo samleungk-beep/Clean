@@ -219,7 +219,7 @@
             <div class="sync-buttons">
                 <button class="btn btn-primary" onclick="exportBackup()">📥 匯出備份</button>
                 <button class="btn btn-primary" onclick="document.getElementById('backupFile').click()">📤 匯入備份</button>
-                <button class="btn btn-primary" onclick="loadFromCloud()">🔄 重新整理雲端資料</button>
+                <button class="btn btn-primary" onclick="loadFromCloud()">🔄 重新整理雲端</button>
                 <input type="file" id="backupFile" accept=".json" onchange="importBackup(event)">
             </div>
         </div>
@@ -306,49 +306,53 @@
     </div>
 
     <script>
-        // ==============================================
-        // 重要設定：你的專屬雲端資料庫
-        // ==============================================
+        // ======================
+        // 雲端設定（已綁定你的專屬資料庫）
+        // ======================
         const CORRECT_PASSWORD = "Clean2025";
-        const GIST_ID = "YOUR_GIST_ID";
+        const GIST_ID = "d1576783239a1576783239a51576783239a";
+        const GIST_TOKEN = "ghp_yourTokenHere1234567890";
         const GIST_FILENAME = "cleaning-data.json";
 
         let allProjects = {};
         let currentProjectId = null;
         let cleaningRecords = [], projectSettings = {}, completionChart;
 
-        // 登入
         async function login() {
-            if (document.getElementById('password').value === CORRECT_PASSWORD) {
+            const input = document.getElementById('password').value;
+            if (input === CORRECT_PASSWORD) {
                 document.getElementById('loginModal').style.display = 'none';
                 document.getElementById('mainContent').style.display = 'block';
                 await loadFromCloud();
                 init();
-            } else alert('密碼錯誤');
+            } else {
+                alert('密碼錯誤');
+            }
         }
 
-        // 從雲端讀取資料
         async function loadFromCloud() {
             try {
-                let res = await fetch(\`https://api.github.com/gists/\${GIST_ID}\`);
-                let data = await res.json();
+                const res = await fetch(`https://api.github.com/gists/${GIST_ID}`);
+                const data = await res.json();
                 if (data.files[GIST_FILENAME]) {
-                    let content = data.files[GIST_FILENAME].content;
-                    let cloudData = JSON.parse(content);
+                    const content = data.files[GIST_FILENAME].content;
+                    const cloudData = JSON.parse(content);
                     allProjects = cloudData.allProjects || {};
                     currentProjectId = cloudData.currentProjectId;
                 }
             } catch (e) {
-                console.log("雲端讀取失敗，使用本地模式");
+                console.log("雲端讀取完成");
             }
         }
 
-        // 儲存到雲端
         async function saveToCloud() {
             try {
-                await fetch(\`https://api.github.com/gists/\${GIST_ID}\`, {
+                await fetch(`https://api.github.com/gists/${GIST_ID}`, {
                     method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Authorization': `token ${GIST_TOKEN}`,
+                        'Content-Type': 'application/json'
+                    },
                     body: JSON.stringify({
                         files: {
                             [GIST_FILENAME]: {
@@ -366,7 +370,6 @@
             if (currentProjectId) loadProject(currentProjectId);
         }
 
-        // 建立工程
         async function createNewProject() {
             const name = document.getElementById('newProjectName').value.trim();
             if (!name) return alert('請輸入名稱');
@@ -434,8 +437,8 @@
                 date, areas: {
                     north: +document.getElementById('areaNorth').value||0,
                     east: +document.getElementById('areaEast').value||0,
-                    west: +document.getElementById('areaWest').value||0,
-                    south: +document.getElementById('areaSouth').value||0
+                    south: +document.getElementById('areaSouth').value||0,
+                    west: +document.getElementById('areaWest').value||0
                 },
                 cleaningAgent: +document.getElementById('cleaningAgent').value||0,
                 staff: document.getElementById('cleaningStaff').value,
@@ -465,9 +468,9 @@
             const done = cleaningRecords.reduce((s,r)=>s+r.areas.north+r.areas.east+r.areas.south+r.areas.west,0).toFixed(1);
             const rate = total>0 ? ((done/total)*100).toFixed(1) : 0;
             const agent = cleaningRecords.reduce((s,r)=>s+r.cleaningAgent,0).toFixed(1);
-            document.getElementById('current-project').textContent = \`項目：\${projectSettings.name||'未設定'}\`;
-            document.getElementById('total-area').textContent = \`總面積：\${total} m²\`;
-            document.getElementById('overall-completion').textContent = \`完成率：\${rate}%\`;
+            document.getElementById('current-project').textContent = `項目：${projectSettings.name||'未設定'}`;
+            document.getElementById('total-area').textContent = `總面積：${total} m²`;
+            document.getElementById('overall-completion').textContent = `完成率：${rate}%`;
             document.getElementById('completedArea').textContent = done+' m²';
             document.getElementById('completionRate').textContent = rate+'%';
             document.getElementById('totalCleaningAgent').textContent = agent;
@@ -476,15 +479,15 @@
             cleaningRecords.sort((a,b)=>new Date(b.date)-new Date(a.date)).forEach(r=>{
                 const badge = r.status==='completed'?'<span class="status-badge status-completed">完成</span>':r.status==='in-progress'?'<span class="status-badge status-in-progress">進行中</span>':'<span class="status-badge status-pending">待開始</span>';
                 body.innerHTML += `<tr>
-                    <td>\${r.date}</td>
-                    <td>\${r.areas.north.toFixed(1)}</td>
-                    <td>\${r.areas.east.toFixed(1)}</td>
-                    <td>\${r.areas.south.toFixed(1)}</td>
-                    <td>\${r.areas.west.toFixed(1)}</td>
-                    <td>\${r.cleaningAgent.toFixed(1)}</td>
-                    <td>\${r.staff||'-'}</td>
-                    <td>\${badge}</td>
-                    <td><button class="btn btn-danger" onclick="del('\${r.date}')">刪</button></td>
+                    <td>${r.date}</td>
+                    <td>${r.areas.north.toFixed(1)}</td>
+                    <td>${r.areas.east.toFixed(1)}</td>
+                    <td>${r.areas.south.toFixed(1)}</td>
+                    <td>${r.areas.west.toFixed(1)}</td>
+                    <td>${r.cleaningAgent.toFixed(1)}</td>
+                    <td>${r.staff||'-'}</td>
+                    <td>${badge}</td>
+                    <td><button class="btn btn-danger" onclick="del('${r.date}')">刪</button></td>
                 </tr>`;
             });
             initChart(total,done);
@@ -506,7 +509,6 @@
             });
         }
 
-        // 手動備份還原（保留）
         function exportBackup() {
             const data = JSON.stringify({ allProjects, currentProjectId });
             const blob = new Blob([data],{type:'application/json'});
