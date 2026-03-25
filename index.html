@@ -271,6 +271,12 @@
                 grid-template-columns: 1fr;
             }
         }
+        .backup-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -295,6 +301,11 @@
                 <span id="current-project">項目名稱：請設定項目</span> | 
                 <span id="total-area">總清潔面積：0 m²</span> | 
                 <span id="overall-completion">整體完成率：0%</span>
+            </div>
+            <div class="backup-group">
+                <button class="btn btn-primary" onclick="exportBackup()"><i class="fas fa-download"></i> 匯出備份</button>
+                <input type="file" id="backupFile" accept=".json" style="display: none;" onchange="importBackup(event)">
+                <button class="btn btn-primary" onclick="document.getElementById('backupFile').click()"><i class="fas fa-upload"></i> 匯入備份</button>
             </div>
         </div>
 
@@ -477,53 +488,21 @@
 
     <script>
         const CORRECT_PASSWORD = "Clean2025";
-        const GIST_ID = "6ba0f5239d7b4b7f9d3e8c4a1f4b4c9e7";
-        const GIST_FILENAME = "cleaning-data.json";
-        let allProjects = {};
-        let currentProjectId = null;
+        let allProjects = JSON.parse(localStorage.getItem('allProjects')) || {};
+        let currentProjectId = localStorage.getItem('currentProjectId') || null;
         let cleaningRecords = [];
         let projectSettings = {};
         let completionChart;
 
-        async function login() {
+        function login() {
             const inputPassword = document.getElementById('password').value;
             if (inputPassword === CORRECT_PASSWORD) {
                 document.getElementById('loginModal').style.display = 'none';
                 document.getElementById('mainContent').style.display = 'block';
-                await loadAllDataFromCloud();
                 initApp();
             } else {
                 alert('密碼錯誤，請重新輸入！');
             }
-        }
-
-        async function loadAllDataFromCloud() {
-            try {
-                const response = await fetch(`https://api.github.com/gists/${GIST_ID}`);
-                const data = await response.json();
-                if (data.files[GIST_FILENAME]) {
-                    const content = data.files[GIST_FILENAME].content;
-                    const cloudData = JSON.parse(content);
-                    allProjects = cloudData.allProjects || {};
-                    currentProjectId = cloudData.currentProjectId;
-                }
-            } catch (e) {
-                allProjects = {};
-                currentProjectId = null;
-            }
-        }
-
-        async function saveAllDataToCloud() {
-            const dataToSave = { allProjects, currentProjectId };
-            try {
-                await fetch(`https://api.github.com/gists/${GIST_ID}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        files: { [GIST_FILENAME]: { content: JSON.stringify(dataToSave, null, 2) } }
-                    })
-                });
-            } catch (e) {}
         }
 
         function initApp() {
@@ -535,7 +514,7 @@
             }
         }
 
-        async function createNewProject() {
+        function createNewProject() {
             const projectName = document.getElementById('newProjectName').value.trim();
             if (!projectName) { alert('請輸入工程名稱！'); return; }
             const projectId = Date.now().toString();
@@ -544,7 +523,7 @@
                 settings: { name: projectName, totalAreas: { north: 0, east: 0, south: 0, west: 0 } },
                 records: []
             };
-            await saveAllDataToCloud();
+            localStorage.setItem('allProjects', JSON.stringify(allProjects));
             document.getElementById('newProjectName').value = '';
             initProjectList();
             switchToProject(projectId);
@@ -553,6 +532,7 @@
 
         function switchToProject(projectId) {
             currentProjectId = projectId;
+            localStorage.setItem('currentProjectId', projectId);
             loadProjectData(projectId);
             initProjectList();
         }
@@ -574,13 +554,14 @@
             if (projectId) switchToProject(projectId);
         }
 
-        async function deleteCurrentProject() {
+        function deleteCurrentProject() {
             if (!currentProjectId) { alert('請先選擇要刪除的工程！'); return; }
             const project = allProjects[currentProjectId];
             if (!confirm(`確定要刪除工程「${project.name}」嗎？`)) return;
             delete allProjects[currentProjectId];
+            localStorage.setItem('allProjects', JSON.stringify(allProjects));
             currentProjectId = null;
-            await saveAllDataToCloud();
+            localStorage.removeItem('currentProjectId');
             cleaningRecords = []; projectSettings = {};
             loadCleaningRecords(); initProjectList(); updateStatistics();
         }
@@ -605,21 +586,21 @@
             });
         }
 
-        async function saveCurrentProjectData() {
+        function saveCurrentProjectData() {
             if (!currentProjectId) return;
             allProjects[currentProjectId].settings = projectSettings;
             allProjects[currentProjectId].records = cleaningRecords;
-            await saveAllDataToCloud();
+            localStorage.setItem('allProjects', JSON.stringify(allProjects));
         }
 
-        async function saveProjectSettings() {
+        function saveProjectSettings() {
             const projectName = document.getElementById('projectName').value;
             const totalNorth = parseFloat(document.getElementById('totalNorth').value)||0;
             const totalEast = parseFloat(document.getElementById('totalEast').value)||0;
             const totalSouth = parseFloat(document.getElementById('totalSouth').value)||0;
             const totalWest = parseFloat(document.getElementById('totalWest').value)||0;
             projectSettings = { name: projectName, totalAreas: { north: totalNorth, east: totalEast, south: totalSouth, west: totalWest } };
-            await saveCurrentProjectData();
+            saveCurrentProjectData();
             loadProjectSettings(); updateStatistics(); initCompletionChart();
             alert('項目設定已儲存！');
         }
@@ -637,7 +618,7 @@
             document.getElementById('totalAreaDisplay').textContent = `${totalArea} m²`;
         }
 
-        async function addCleaningRecord() {
+        function addCleaningRecord() {
             const recordDate = document.getElementById('recordDate').value;
             const areaNorth = parseFloat(document.getElementById('areaNorth').value)||0;
             const areaEast = parseFloat(document.getElementById('areaEast').value)||0;
@@ -656,7 +637,7 @@
                 cleaningAgent, staff: cleaningStaff, status: workStatus, remark
             });
             cleaningRecords.sort((a,b)=>new Date(b.date)-new Date(a.date));
-            await saveCurrentProjectData();
+            saveCurrentProjectData();
             
             document.getElementById('areaNorth').value='';
             document.getElementById('areaEast').value='';
@@ -667,7 +648,7 @@
             document.getElementById('remark').value='';
             
             loadCleaningRecords(); updateStatistics(); initCompletionChart(); generateMonthFilter();
-            alert('記錄已儲存至雲端！');
+            alert('記錄已儲存！');
         }
 
         function loadCleaningRecords(filtered=null) {
@@ -747,7 +728,7 @@
         async function deleteRecord(id){
             if(!confirm('確定刪除？'))return;
             cleaningRecords=cleaningRecords.filter(r=>r.id!==id);
-            await saveCurrentProjectData();
+            saveCurrentProjectData();
             loadCleaningRecords();updateStatistics();initCompletionChart();generateMonthFilter();
         }
 
@@ -758,6 +739,40 @@
             })));
             const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"清潔記錄");
             XLSX.writeFile(wb,"清潔記錄.xlsx");
+        }
+
+        // 備份/還原功能
+        function exportBackup() {
+            const backupData = { allProjects, currentProjectId };
+            const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `清潔記錄備份_${new Date().toLocaleDateString()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            alert('備份檔已匯出！');
+        }
+
+        function importBackup(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const backupData = JSON.parse(e.target.result);
+                    allProjects = backupData.allProjects || {};
+                    currentProjectId = backupData.currentProjectId;
+                    localStorage.setItem('allProjects', JSON.stringify(allProjects));
+                    localStorage.setItem('currentProjectId', currentProjectId);
+                    initApp();
+                    alert('備份已還原！');
+                } catch (err) {
+                    alert('備份檔格式錯誤，無法還原！');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
         }
     </script>
 </body>
