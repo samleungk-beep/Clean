@@ -162,7 +162,6 @@
 <script>
 const CORRECT_PASSWORD = "Clean2025";
 const GIST_ID = "ae8eb3ba9154660a3b1031cedc83b9bf";
-const GIST_TOKEN = "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";
 const GIST_FILENAME = "cleaning-data.json";
 
 let allProjects = {};
@@ -184,7 +183,7 @@ function login() {
 }
 
 // ------------------------------
-// 從雲端讀取
+// 從雲端讀取（不需要Token）
 // ------------------------------
 async function loadFromCloud() {
     try {
@@ -204,10 +203,13 @@ async function loadFromCloud() {
 }
 
 // ------------------------------
-// 儲存到雲端
+// 儲存到雲端（彈窗輸入Token，不會寫死）
 // ------------------------------
 async function saveToCloud() {
     try {
+        const token = prompt("請輸入您的雲端金鑰（Token）：");
+        if (!token) return false;
+
         const payload = {
             files: {
                 [GIST_FILENAME]: {
@@ -215,15 +217,17 @@ async function saveToCloud() {
                 }
             }
         };
+
         const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
             method: 'PATCH',
             headers: {
-                'Authorization': `token ${GIST_TOKEN}`,
+                'Authorization': `token ${token}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(payload)
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        if (!res.ok) throw new Error("Token 錯誤或權限不足");
         return true;
     } catch (e) {
         console.error(e);
@@ -236,7 +240,7 @@ async function saveToCloudAndAlert() {
     if (ok) {
         alert("✅ 已成功儲存到雲端！");
     } else {
-        alert("❌ 儲存到雲端失敗");
+        alert("❌ 儲存失敗，請確認 Token 正確");
     }
 }
 
