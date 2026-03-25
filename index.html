@@ -20,7 +20,6 @@
         .btn { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 1em; }
         .btn-primary { background: #2c6eec; color: white; }
         .btn-danger { background: #ff4444; color: white; }
-        .btn-save-cloud { background: #28a745; color: white; width: 100%; padding: 15px; font-size: 1.2em; margin-top: 20px; }
         .table-container { overflow-x: auto; margin-top: 20px; }
         table { width: 100%; border-collapse: collapse; min-width: 800px; }
         th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #ddd; }
@@ -43,8 +42,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body>
 
+<body>
 <div class="login-modal" id="loginModal">
     <div class="login-box">
         <h2><i class="fas fa-lock"></i> 清潔記錄 - 登入</h2>
@@ -64,10 +63,9 @@
             <span id="overall-completion">完成率：0%</span>
         </div>
         <div class="sync-buttons">
-            <button class="btn btn-primary" onclick="exportBackup()">📥 匯出備份</button>
-            <button class="btn btn-primary" onclick="document.getElementById('backupFile').click()">📤 匯入備份</button>
-            <button class="btn btn-primary" onclick="loadFromCloud()">🔄 重新整理雲端</button>
-            <input type="file" id="backupFile" accept=".json" onchange="importBackup(event)">
+            <button class="btn btn-primary" onclick="exportData()">💾 匯出備份</button>
+            <button class="btn btn-primary" onclick="importData()">📤 匯入備份</button>
+            <input type="file" id="backupFile" accept=".json" onchange="doImport(event)">
         </div>
     </div>
 
@@ -75,9 +73,9 @@
         <div class="card-header"><h2><i class="fas fa-folder-open"></i> 工程管理</h2></div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
             <input type="text" id="newProjectName" placeholder="新工程名稱" style="flex:1;min-width:200px;">
-            <button class="btn btn-primary" onclick="createNewProject()">新增工程</button>
+            <button class="btn btn-primary" onclick="createProject()">新增工程</button>
             <select id="currentProjectSelect" onchange="switchProject()" style="flex:1;min-width:200px;"></select>
-            <button class="btn btn-danger" onclick="deleteCurrentProject()">刪除工程</button>
+            <button class="btn btn-danger" onclick="deleteProject()">刪除工程</button>
         </div>
         <div id="projectList" style="margin-top:15px;max-height:200px;overflow-y:auto;border:1px solid #ddd;border-radius:5px;"></div>
     </div>
@@ -99,7 +97,7 @@
                         <div><label>西向</label><input type="number" id="totalWest"></div>
                     </div>
                 </div>
-                <button class="btn btn-primary" onclick="saveProjectSettings()">儲存設定</button>
+                <button class="btn btn-primary" onclick="saveSettings()">儲存設定</button>
             </div>
 
             <div class="card">
@@ -124,7 +122,7 @@
                     </select>
                 </div>
                 <div class="form-group"><label>備註</label><textarea id="remark" rows="3"></textarea></div>
-                <button class="btn btn-primary" onclick="addCleaningRecord()">新增記錄</button>
+                <button class="btn btn-primary" onclick="addRecord()">新增記錄</button>
             </div>
         </div>
 
@@ -155,290 +153,133 @@
             </div>
         </div>
     </div>
-
-    <button class="btn btn-save-cloud" onclick="saveToCloudAndAlert()">💾 儲存所有修改到雲端</button>
 </div>
 
 <script>
-const CORRECT_PASSWORD = "Clean2025";
-const GIST_ID = "ae8eb3ba9154660a3b1031cedc83b9bf";
-const GIST_FILENAME = "cleaning-data.json";
+const PW = "Clean2025";
+let projects = {}, currentId = null, chart;
 
-let allProjects = {};
-let currentProjectId = null;
-let cleaningRecords = [], projectSettings = {}, completionChart;
-
-// ------------------------------
 // 登入
-// ------------------------------
 function login() {
-    const pw = document.getElementById('password').value;
-    if (pw === CORRECT_PASSWORD) {
-        document.getElementById('loginModal').style.display = 'none';
-        document.getElementById('mainContent').style.display = 'block';
-        loadFromCloud();
-    } else {
-        alert('密碼錯誤');
-    }
+    if (document.getElementById('password').value === PW) {
+        document.getElementById('loginModal').style.display = "none";
+        document.getElementById('mainContent').style.display = "block";
+        loadData();
+    } else alert("密碼錯誤");
 }
 
-// ------------------------------
-// 從雲端讀取（不需要Token）
-// ------------------------------
-async function loadFromCloud() {
-    try {
-        const res = await fetch(`https://api.github.com/gists/${GIST_ID}`);
-        const data = await res.json();
-        const file = data.files[GIST_FILENAME];
-        if (file) {
-            const cloudData = JSON.parse(file.content);
-            allProjects = cloudData.allProjects || {};
-            currentProjectId = cloudData.currentProjectId;
-            alert("✅ 從雲端載入成功");
-        }
-    } catch (e) {
-        alert("⚠️ 雲端讀取失敗：" + e.message);
-    }
-    init();
+// 本機儲存
+function saveData() {
+    localStorage.setItem("cleanData", JSON.stringify({ projects, currentId }));
+    alert("✅ 本機儲存成功");
 }
 
-// ------------------------------
-// 儲存到雲端（彈窗輸入Token，不會寫死）
-// ------------------------------
-async function saveToCloud() {
-    try {
-        const token = prompt("請輸入您的雲端金鑰（Token）：");
-        if (!token) return false;
-
-        const payload = {
-            files: {
-                [GIST_FILENAME]: {
-                    content: JSON.stringify({ allProjects, currentProjectId }, null, 2)
-                }
-            }
-        };
-
-        const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
-            method: 'PATCH',
-            headers: {
-                'Authorization': `token ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
-        });
-
-        if (!res.ok) throw new Error("Token 錯誤或權限不足");
-        return true;
-    } catch (e) {
-        console.error(e);
-        return false;
-    }
-}
-
-async function saveToCloudAndAlert() {
-    const ok = await saveToCloud();
-    if (ok) {
-        alert("✅ 已成功儲存到雲端！");
-    } else {
-        alert("❌ 儲存失敗，請確認 Token 正確");
-    }
-}
-
-// ------------------------------
-// 初始化 & 渲染
-// ------------------------------
-function init() {
-    document.getElementById('recordDate').valueAsDate = new Date();
+function loadData() {
+    const d = JSON.parse(localStorage.getItem("cleanData") || "{\"projects\":{},\"currentId\":null}");
+    projects = d.projects; currentId = d.currentId;
     render();
 }
 
+// 專案
 function render() {
-    renderProjectList();
-    if (!currentProjectId) return;
-
-    const proj = allProjects[currentProjectId];
-    projectSettings = proj.settings;
-    cleaningRecords = proj.records || [];
-
-    document.getElementById('projectName').value = projectSettings.name || '';
-    document.getElementById('totalNorth').value = projectSettings.totalAreas?.north || 0;
-    document.getElementById('totalEast').value  = projectSettings.totalAreas?.east  || 0;
-    document.getElementById('totalSouth').value = projectSettings.totalAreas?.south || 0;
-    document.getElementById('totalWest').value  = projectSettings.totalAreas?.west  || 0;
-
-    const total = (+projectSettings.totalAreas?.north||0) + (+projectSettings.totalAreas?.east||0) + (+projectSettings.totalAreas?.south||0) + (+projectSettings.totalAreas?.west||0);
-    const done  = cleaningRecords.reduce((s,r)=>s + (+r.areas.north||0) + (+r.areas.east||0) + (+r.areas.south||0) + (+r.areas.west||0), 0);
-    const rate  = total>0 ? ((done/total)*100).toFixed(1) : 0;
-    const agent = cleaningRecords.reduce((s,r)=>s + (+r.cleaningAgent||0), 0);
-
-    document.getElementById('current-project').textContent = `項目：${projectSettings.name || '未設定'}`;
-    document.getElementById('total-area').textContent = `總面積：${total.toFixed(1)} m²`;
-    document.getElementById('overall-completion').textContent = `完成率：${rate}%`;
-    document.getElementById('completedArea').textContent = done.toFixed(1)+' m²';
-    document.getElementById('completionRate').textContent = rate+'%';
-    document.getElementById('totalCleaningAgent').textContent = agent.toFixed(1);
-
-    const tbody = document.getElementById('recordsTableBody');
-    tbody.innerHTML = '';
-    cleaningRecords.sort((a,b)=>new Date(b.date)-new Date(a.date)).forEach(r=>{
-        const badge = r.status==='completed' ? '<span class="status-badge status-completed">完成</span>'
-                  : r.status==='in-progress' ? '<span class="status-badge status-in-progress">進行中</span>'
-                  : '<span class="status-badge status-pending">待開始</span>';
-        tbody.innerHTML += `<tr>
-            <td>${r.date}</td>
-            <td>${(+r.areas.north||0).toFixed(1)}</td>
-            <td>${(+r.areas.east||0).toFixed(1)}</td>
-            <td>${(+r.areas.south||0).toFixed(1)}</td>
-            <td>${(+r.areas.west||0).toFixed(1)}</td>
-            <td>${(+r.cleaningAgent||0).toFixed(1)}</td>
-            <td>${r.staff||'-'}</td>
-            <td>${badge}</td>
-            <td><button class="btn btn-danger" onclick="del('${r.date}')">刪</button></td>
-        </tr>`;
-    });
-    updateChart(total,done);
+    const sel = document.getElementById("currentProjectSelect");
+    sel.innerHTML = "<option value=''>請選擇專案</option>";
+    Object.entries(projects).forEach(([k,p]) => sel.innerHTML += `<option value="${k}" ${k==currentId?"selected":""}>${p.name}</option>`);
+    if (!currentId) return;
+    const p = projects[currentId];
+    document.getElementById("projectName").value = p.name||"";
+    document.getElementById("totalNorth").value = p.totalNorth||0;
+    document.getElementById("totalEast").value = p.totalEast||0;
+    document.getElementById("totalSouth").value = p.totalSouth||0;
+    document.getElementById("totalWest").value = p.totalWest||0;
+    renderList(p.records||[]);
+    updateStats(p);
 }
 
-function updateChart(total,done) {
-    const ctx = document.getElementById('completionChart').getContext('2d');
-    if (completionChart) completionChart.destroy();
-    completionChart = new Chart(ctx,{
-        type:'doughnut',
-        data:{
-            labels:['已完成','剩餘'],
-            datasets:[{ data:[done, Math.max(0,total-done)], backgroundColor:['#2c6eec','#e0e0e0'] }]
-        },
-        options:{ cutout:'60%' }
-    });
-}
-
-// ------------------------------
-// 專案管理
-// ------------------------------
-function renderProjectList() {
-    const sel = document.getElementById('currentProjectSelect');
-    const list = document.getElementById('projectList');
-    sel.innerHTML = '<option value="">請選擇工程</option>';
-    list.innerHTML = '';
-    Object.entries(allProjects).forEach(([id,p])=>{
-        sel.innerHTML += `<option value="${id}" ${id==currentProjectId?'selected':''}>${p.name}</option>`;
-        list.innerHTML += `<div class="project-list-item ${id==currentProjectId?'active':''}" onclick="switchProjectId('${id}')">${p.name} (${p.records?.length||0} 筆)</div>`;
-    });
-}
-
-function createNewProject() {
-    const name = document.getElementById('newProjectName').value.trim();
-    if (!name) return alert('請輸入名稱');
+function createProject() {
+    const name = document.getElementById("newProjectName").value.trim();
+    if (!name) return alert("請輸入名稱");
     const id = Date.now().toString();
-    allProjects[id] = {
-        name,
-        settings: { name, totalAreas: {north:0,east:0,south:0,west:0} },
-        records: []
-    };
-    document.getElementById('newProjectName').value = '';
-    switchProjectId(id);
-}
-
-function switchProject() {
-    switchProjectId(document.getElementById('currentProjectSelect').value);
-}
-
-function switchProjectId(id) {
-    currentProjectId = id;
+    projects[id] = { name, totalNorth:0,totalEast:0,totalSouth:0,totalWest:0, records:[] };
+    currentId = id;
+    saveData();
     render();
 }
 
-function deleteCurrentProject() {
-    if (!currentProjectId) return;
-    delete allProjects[currentProjectId];
-    currentProjectId = null;
-    render();
+function switchProject() { currentId = document.getElementById("currentProjectSelect").value; render(); }
+function deleteProject() { if (!currentId) return; delete projects[currentId]; currentId = null; saveData(); render(); }
+
+// 設定 & 記錄
+function saveSettings() {
+    if (!currentId) return alert("請選專案");
+    const p = projects[currentId];
+    p.name = document.getElementById("projectName").value;
+    p.totalNorth = +document.getElementById("totalNorth").value;
+    p.totalEast = +document.getElementById("totalEast").value;
+    p.totalSouth = +document.getElementById("totalSouth").value;
+    p.totalWest = +document.getElementById("totalWest").value;
+    saveData(); render();
 }
 
-// ------------------------------
-// 記錄操作
-// ------------------------------
-function saveProjectSettings() {
-    if (!currentProjectId) return alert('請先選擇專案');
-    const s = allProjects[currentProjectId].settings;
-    s.name = document.getElementById('projectName').value;
-    s.totalAreas = {
-        north: +document.getElementById('totalNorth').value||0,
-        east:  +document.getElementById('totalEast').value ||0,
-        south: +document.getElementById('totalSouth').value||0,
-        west:  +document.getElementById('totalWest').value ||0
-    };
-    render();
-    alert('✅ 設定已儲存（本機）');
-}
-
-function addCleaningRecord() {
-    if (!currentProjectId) return alert('請先選擇專案');
-    const date = document.getElementById('recordDate').value;
-    if (!date) return alert('請選擇日期');
-    const records = allProjects[currentProjectId].records ||= [];
-    const idx = records.findIndex(x=>x.date===date);
+function addRecord() {
+    if (!currentId) return alert("請選專案");
+    const d = document.getElementById("recordDate").value;
+    if (!d) return alert("請選日期");
     const rec = {
-        date,
-        areas: {
-            north: +document.getElementById('areaNorth').value||0,
-            east:  +document.getElementById('areaEast').value ||0,
-            south: +document.getElementById('areaSouth').value||0,
-            west:  +document.getElementById('areaWest').value ||0
-        },
-        cleaningAgent: +document.getElementById('cleaningAgent').value||0,
-        staff: document.getElementById('cleaningStaff').value,
-        status: document.getElementById('workStatus').value,
-        remark: document.getElementById('remark').value
+        date:d, north:+document.getElementById("areaNorth").value, east:+document.getElementById("areaEast").value,
+        south:+document.getElementById("areaSouth").value, west:+document.getElementById("areaWest").value,
+        agent:+document.getElementById("cleaningAgent").value, staff:document.getElementById("cleaningStaff").value,
+        status:document.getElementById("workStatus").value, note:document.getElementById("remark").value
     };
-    if (idx>=0) records[idx] = rec; else records.push(rec);
-    document.getElementById('areaNorth').value='';
-    document.getElementById('areaEast').value='';
-    document.getElementById('areaSouth').value='';
-    document.getElementById('areaWest').value='';
-    document.getElementById('cleaningAgent').value='';
-    document.getElementById('cleaningStaff').value='';
-    document.getElementById('remark').value='';
-    render();
-    alert('✅ 記錄已新增/更新（本機）');
+    const arr = projects[currentId].records ||= [];
+    const idx = arr.findIndex(x=>x.date===d);
+    if (idx >= 0) arr[idx] = rec; else arr.push(rec);
+    saveData(); render();
+}
+
+function renderList(recs) {
+    const b = document.getElementById("recordsTableBody");
+    b.innerHTML = "";
+    recs.sort((a,b)=>new Date(b.date)-new Date(a.date)).forEach(r=>{
+        const badge = r.status==="completed"?'<span class="status-badge status-completed">完成</span>':r.status==="in-progress"?'<span class="status-badge status-in-progress">進行中</span>':'<span class="status-badge status-pending">待開始</span>';
+        b.innerHTML += `<tr><td>${r.date}</td><td>${r.north}</td><td>${r.east}</td><td>${r.south}</td><td>${r.west}</td><td>${r.agent}</td><td>${r.staff||'-'}</td><td>${badge}</td><td><button class="btn btn-danger" onclick="del('${r.date}')">刪</button></td></tr>`;
+    });
 }
 
 function del(date) {
-    if (!currentProjectId) return;
-    const recs = allProjects[currentProjectId].records;
-    if (!recs) return;
-    allProjects[currentProjectId].records = recs.filter(x=>x.date!==date);
-    render();
-    alert('✅ 已刪除該日期記錄');
+    if (!currentId) return;
+    projects[currentId].records = projects[currentId].records.filter(x=>x.date!==date);
+    saveData(); render();
 }
 
-// ------------------------------
-// 匯出 / 匯入
-// ------------------------------
-function exportBackup() {
-    const data = JSON.stringify({ allProjects, currentProjectId });
-    const blob = new Blob([data],{type:'application/json'});
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'clean-backup.json';
+// 統計圖表
+function updateStats(p) {
+    const total = (+p.totalNorth||0)+(+p.totalEast||0)+(+p.totalSouth||0)+(+p.totalWest||0);
+    const done = (p.records||[]).reduce((s,r)=>s+(+r.north||0)+(+r.east||0)+(+r.south||0)+(+r.west||0),0);
+    const rate = total>0?((done/total)*100).toFixed(1):0;
+    const agent = (p.records||[]).reduce((s,r)=>s+(+r.agent||0),0);
+    document.getElementById("completedArea").textContent = done;
+    document.getElementById("completionRate").textContent = rate+"%";
+    document.getElementById("totalCleaningAgent").textContent = agent;
+    if (chart) chart.destroy();
+    chart = new Chart(document.getElementById("completionChart").getContext("2d"),{
+        type:"doughnut", data:{ labels:["已完成","剩餘"], datasets:[{ data:[done,Math.max(0,total-done)], backgroundColor:["#2c6eec","#e0e0e0"] }] }, options:{ cutout:"60%" }
+    });
+}
+
+// 匯出/匯入（跨設備同步）
+function exportData() {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([JSON.stringify({projects,currentId})],{type:"application/json"}));
+    a.download = "clean-backup.json";
     a.click();
-    alert('匯出成功');
+    alert("✅ 備份匯出成功");
 }
-
-async function importBackup(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev=>{
-        try{
-            const d = JSON.parse(ev.target.result);
-            allProjects = d.allProjects;
-            currentProjectId = d.currentProjectId;
-            render();
-            alert('匯入成功，記得點「儲存到雲端」');
-        }catch(e){ alert('檔案錯誤'); }
-    };
-    reader.readAsText(file);
+function importData() { document.getElementById("backupFile").click(); }
+function doImport(e) {
+    const r = new FileReader();
+    r.onload = ev=>{ try{const d=JSON.parse(ev.target.result);projects=d.projects;currentId=d.currentId;saveData();render();alert("✅ 匯入成功");}catch(e){alert("檔案錯誤");}};
+    r.readAsText(e.target.files[0]);
 }
 </script>
 </body>
