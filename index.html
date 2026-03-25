@@ -318,7 +318,7 @@
     <script>
         const CORRECT_PASSWORD = "Clean2025";
         const GIST_ID = "ae8eb3ba9154660a3b1031cedc83b9bf";
-        // Token 已隱藏，不會出現在程式碼裡
+        const GIST_TOKEN = "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";
         const GIST_FILENAME = "cleaning-data.json";
 
         let allProjects = {};
@@ -349,22 +349,16 @@
                     alert('✅ 已從雲端載入最新資料');
                 }
             } catch (e) {
-                alert('⚠️ 雲端載入失敗，使用本地資料');
+                alert('⚠️ 雲端載入失敗');
             }
         }
 
         async function saveToCloud() {
             try {
-                // 透過 CORS Anywhere 中繼服務隱藏 Token，避免直接暴露在程式碼中
-                const proxyUrl = "https://corsproxy.io/?";
-                const apiUrl = `https://api.github.com/gists/${GIST_ID}`;
-                const token = prompt("請輸入雲端同步密碼（Token）：");
-                if (!token) return false;
-
-                const res = await fetch(proxyUrl + apiUrl, {
+                const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
                     method: 'PATCH',
                     headers: {
-                        'Authorization': `token ${token}`,
+                        'Authorization': `token ${GIST_TOKEN}`,
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
@@ -382,11 +376,11 @@
         }
 
         async function saveToCloudAndAlert() {
-            const success = await saveToCloud();
-            if (success) {
-                alert('✅ 所有修改已儲存到雲端！其他人打開網頁就能看到最新內容');
+            const ok = await saveToCloud();
+            if (ok) {
+                alert('✅ 已成功儲存到雲端！');
             } else {
-                alert('❌ 儲存到雲端失敗，請檢查密碼或網路');
+                alert('❌ 儲存失敗，Token 可能已過期');
             }
         }
 
@@ -406,7 +400,10 @@
             switchProjectId(id);
         }
 
-        function switchProject() { switchProjectId(document.getElementById('currentProjectSelect').value); }
+        function switchProject() {
+            switchProjectId(document.getElementById('currentProjectSelect').value);
+        }
+
         function switchProjectId(id) {
             currentProjectId = id;
             loadProject(id);
@@ -439,17 +436,18 @@
 
         function saveProjectSettings() {
             const name = document.getElementById('projectName').value;
-            projectSettings = {
-                name, totalAreas: {
-                    north: +document.getElementById('totalNorth').value||0,
-                    east: +document.getElementById('totalEast').value||0,
-                    south: +document.getElementById('totalSouth').value||0,
-                    west: +document.getElementById('totalWest').value||0
-                }
+            projectSettings.name = name;
+            projectSettings.totalAreas = {
+                north: +document.getElementById('totalNorth').value||0,
+                east: +document.getElementById('totalEast').value||0,
+                south: +document.getElementById('totalSouth').value||0,
+                west: +document.getElementById('totalWest').value||0
             };
-            if (currentProjectId) allProjects[currentProjectId].settings = projectSettings;
+            if (currentProjectId) {
+                allProjects[currentProjectId].settings = projectSettings;
+            }
             render();
-            alert('✅ 本地設定已儲存，點擊底部按鈕可上傳到雲端');
+            alert('✅ 本地設定已儲存');
         }
 
         function addCleaningRecord() {
@@ -457,7 +455,8 @@
             if (!date) return alert('請選日期');
             cleaningRecords = cleaningRecords.filter(x => x.date !== date);
             cleaningRecords.push({
-                date, areas: {
+                date,
+                areas: {
                     north: +document.getElementById('areaNorth').value||0,
                     east: +document.getElementById('areaEast').value||0,
                     south: +document.getElementById('areaSouth').value||0,
@@ -468,16 +467,18 @@
                 status: document.getElementById('workStatus').value,
                 remark: document.getElementById('remark').value
             });
-            if (currentProjectId) allProjects[currentProjectId].records = cleaningRecords;
-            document.getElementById('areaNorth').value='';
-            document.getElementById('areaEast').value='';
-            document.getElementById('areaSouth').value='';
-            document.getElementById('areaWest').value='';
-            document.getElementById('cleaningAgent').value='';
-            document.getElementById('cleaningStaff').value='';
-            document.getElementById('remark').value='';
+            if (currentProjectId) {
+                allProjects[currentProjectId].records = cleaningRecords;
+            }
+            document.getElementById('areaNorth').value = '';
+            document.getElementById('areaEast').value = '';
+            document.getElementById('areaSouth').value = '';
+            document.getElementById('areaWest').value = '';
+            document.getElementById('cleaningAgent').value = '';
+            document.getElementById('cleaningStaff').value = '';
+            document.getElementById('remark').value = '';
             render();
-            alert('✅ 本地記錄已新增，點擊底部按鈕可上傳到雲端');
+            alert('✅ 本地記錄已新增');
         }
 
         function render() {
@@ -488,20 +489,27 @@
             document.getElementById('totalEast').value = projectSettings.totalAreas.east;
             document.getElementById('totalSouth').value = projectSettings.totalAreas.south;
             document.getElementById('totalWest').value = projectSettings.totalAreas.west;
+
             const total = (+projectSettings.totalAreas.north + +projectSettings.totalAreas.east + +projectSettings.totalAreas.south + +projectSettings.totalAreas.west).toFixed(1);
-            const done = cleaningRecords.reduce((s,r)=>s+r.areas.north+r.areas.east+r.areas.south+r.areas.west,0).toFixed(1);
-            const rate = total>0 ? ((done/total)*100).toFixed(1) : 0;
-            const agent = cleaningRecords.reduce((s,r)=>s+r.cleaningAgent,0).toFixed(1);
+            const done = cleaningRecords.reduce((s,r)=>s+(+r.areas.north)+(+r.areas.east)+(+r.areas.south)+(+r.areas.west), 0).toFixed(1);
+            const rate = total > 0 ? ((done/total)*100).toFixed(1) : 0;
+            const agent = cleaningRecords.reduce((s,r)=>s+(+r.cleaningAgent), 0).toFixed(1);
+
             document.getElementById('current-project').textContent = `項目：${projectSettings.name||'未設定'}`;
             document.getElementById('total-area').textContent = `總面積：${total} m²`;
             document.getElementById('overall-completion').textContent = `完成率：${rate}%`;
             document.getElementById('completedArea').textContent = done+' m²';
             document.getElementById('completionRate').textContent = rate+'%';
             document.getElementById('totalCleaningAgent').textContent = agent;
+
             const body = document.getElementById('recordsTableBody');
             body.innerHTML = '';
             cleaningRecords.sort((a,b)=>new Date(b.date)-new Date(a.date)).forEach(r=>{
-                const badge = r.status==='completed'?'<span class="status-badge status-completed">完成</span>':r.status==='in-progress'?'<span class="status-badge status-in-progress">進行中</span>':'<span class="status-badge status-pending">待開始</span>';
+                const badge = r.status==='completed'
+                    ? '<span class="status-badge status-completed">完成</span>'
+                    : r.status==='in-progress'
+                        ? '<span class="status-badge status-in-progress">進行中</span>'
+                        : '<span class="status-badge status-pending">待開始</span>';
                 body.innerHTML += `<tr>
                     <td>${r.date}</td>
                     <td>${r.areas.north.toFixed(1)}</td>
@@ -521,7 +529,7 @@
             cleaningRecords = cleaningRecords.filter(x=>x.date!==date);
             if (currentProjectId) allProjects[currentProjectId].records = cleaningRecords;
             render();
-            alert('✅ 本地記錄已刪除，點擊底部按鈕可上傳到雲端');
+            alert('✅ 本機記錄已刪除');
         }
 
         function initChart(total,done) {
@@ -557,8 +565,10 @@
                     currentProjectId = data.currentProjectId;
                     await saveToCloud();
                     init();
-                    alert('匯入成功！');
-                }catch(e){alert('檔案錯誤')}
+                    alert('匯入並同步雲端成功！');
+                }catch(e){
+                    alert('檔案錯誤');
+                }
             };
             reader.readAsText(file);
         }
