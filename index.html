@@ -459,27 +459,37 @@
     function saveProjectFromModal() {
         const name = document.getElementById('modalProjectName').value.trim();
         if (!name) { alert('請輸入工程名稱'); return; }
+        
+        // 🔥 完全修復：正確讀取所有表單值
         const startDate = document.getElementById('modalStartDate').value;
         const endDate = document.getElementById('modalEndDate').value;
         const totalAreas = {
-            north: +document.getElementById('modalTotalNorth').value || 0,
-            east: +document.getElementById('modalTotalEast').value || 0,
-            south: +document.getElementById('modalTotalSouth').value || 0,
-            west: +document.getElementById('modalTotalWest').value || 0
+            north:  Number(document.getElementById('modalTotalNorth').value) || 0,
+            east:   Number(document.getElementById('modalTotalEast').value) || 0,
+            south:  Number(document.getElementById('modalTotalSouth').value) || 0,
+            west:   Number(document.getElementById('modalTotalWest').value) || 0
         };
 
         if (isEditMode) {
-            allProjects[currentProjectId].settings = { name, startDate, endDate, totalAreas };
-            saveAll();
+            // 🔥 徹底修復：直接覆蓋專案設定
+            allProjects[currentProjectId].settings = {
+                name, startDate, endDate, totalAreas
+            };
+            localStorage.setItem('allProjects', JSON.stringify(allProjects));
             loadProject(currentProjectId);
-            renderProjectInfoTable();
         } else {
+            // 新增工程
             const id = Date.now().toString();
-            allProjects[id] = { name, settings: { name, startDate, endDate, totalAreas }, records: [] };
-            saveAll();
+            allProjects[id] = {
+                name,
+                settings: { name, startDate, endDate, totalAreas },
+                records: []
+            };
+            localStorage.setItem('allProjects', JSON.stringify(allProjects));
             currentProjectId = id;
             localStorage.setItem('currentProjectId', id);
         }
+
         closeModal();
         renderProjectInfoTable();
         render();
@@ -505,7 +515,7 @@
             currentProjectId = null;
             localStorage.removeItem('currentProjectId');
         }
-        saveAll();
+        localStorage.setItem('allProjects', JSON.stringify(allProjects));
         closeDeleteModal();
         renderProjectInfoTable();
         render();
@@ -566,7 +576,7 @@
             staff: document.getElementById('cleaningStaff').value,
             remark: document.getElementById('remark').value
         });
-        saveAll();
+        localStorage.setItem('allProjects', JSON.stringify(allProjects));
         document.getElementById('cleanArea').value='';
         document.getElementById('cleaningAgent').value='';
         document.getElementById('cleaningStaff').value='';
@@ -578,7 +588,7 @@
     function render() {
         if (!projectSettings) return;
         
-        const total = (+projectSettings.totalAreas.north + +projectSettings.totalAreas.east + +projectSettings.totalAreas.south + +projectSettings.totalAreas.west).toFixed(1);
+        const total = (+projectSettings.totalAreas.north + +projectSettings.totalAreas.east + +p.settings.totalAreas.south + +projectSettings.totalAreas.west).toFixed(1);
         const done = cleaningRecords.reduce((s,r)=>s + r.cleanArea, 0).toFixed(1);
         const rate = total>0 ? ((done/total)*100).toFixed(1) : 0;
         const agent = cleaningRecords.reduce((s,r)=>s + r.cleaningAgent, 0).toFixed(1);
@@ -609,7 +619,7 @@
 
     function del(date) {
         cleaningRecords = cleaningRecords.filter(x=>x.date!==date);
-        saveAll();
+        localStorage.setItem('allProjects', JSON.stringify(allProjects));
         renderProjectInfoTable();
         render();
     }
@@ -624,11 +634,7 @@
         });
     }
 
-    function saveAll() {
-        if (currentProjectId) allProjects[currentProjectId] = { ...allProjects[currentProjectId], settings: projectSettings, records: cleaningRecords };
-        localStorage.setItem('allProjects', JSON.stringify(allProjects));
-    }
-
+    // 備份還原
     function exportBackup() {
         const data = JSON.stringify({ allProjects, currentProjectId });
         const blob = new Blob([data],{type:"application/json"});
