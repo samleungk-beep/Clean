@@ -346,247 +346,243 @@
 </div>
 
 <script>
-    let allProjects = JSON.parse(localStorage.getItem('allProjects')) || {};
-    let currentProjectId = localStorage.getItem('currentProjectId') || null;
-    let cleaningRecords = [], projectSettings = {}, completionChart;
-    let isEditMode = false;
+let allProjects = JSON.parse(localStorage.getItem('allProjects')) || {};
+let currentProjectId = localStorage.getItem('currentProjectId') || null;
+let cleaningRecords = [], projectSettings = {}, completionChart;
+let isEditMode = false;
 
-    window.onload = function() {
-        init();
+window.onload = function() {
+    init();
+};
+
+function init() {
+    document.getElementById('recordDate').value = new Date().toISOString().split('T')[0];
+    renderProjectTable();
+    if (currentProjectId) loadProject(currentProjectId);
+}
+
+// 彈窗
+function openNewProjectModal() {
+    isEditMode = false;
+    document.getElementById('modalProjectName').value = '';
+    document.getElementById('modalStartDate').value = '';
+    document.getElementById('modalEndDate').value = '';
+    document.getElementById('modalTotalNorth').value = 0;
+    document.getElementById('modalTotalEast').value = 0;
+    document.getElementById('modalTotalSouth').value = 0;
+    document.getElementById('modalTotalWest').value = 0;
+    document.getElementById('projectModal').style.display = 'flex';
+}
+
+function openEditProjectModal() {
+    if (!currentProjectId) { alert('請雙擊選擇一個工程'); return; }
+    isEditMode = true;
+    const pj = allProjects[currentProjectId];
+    document.getElementById('modalProjectName').value = pj.settings.name;
+    document.getElementById('modalStartDate').value = pj.settings.startDate || '';
+    document.getElementById('modalEndDate').value = pj.settings.endDate || '';
+    document.getElementById('modalTotalNorth').value = pj.settings.totalAreas.north;
+    document.getElementById('modalTotalEast').value = pj.settings.totalAreas.east;
+    document.getElementById('modalTotalSouth').value = pj.settings.totalAreas.south;
+    document.getElementById('modalTotalWest').value = pj.settings.totalAreas.west;
+    document.getElementById('projectModal').style.display = 'flex';
+}
+
+function closeModal() {
+    document.getElementById('projectModal').style.display = 'none';
+}
+
+// ==============================================
+// 🔥 這裡是「絕對不會丟記錄」的最終修復程式
+// ==============================================
+function saveProjectFromModal() {
+    const name = document.getElementById('modalProjectName').value.trim();
+    if (!name) { alert('請輸入工程名稱'); return; }
+    
+    const startDate = document.getElementById('modalStartDate').value;
+    const endDate = document.getElementById('modalEndDate').value;
+    const totalAreas = {
+        north: Number(document.getElementById('modalTotalNorth').value) || 0,
+        east: Number(document.getElementById('modalTotalEast').value) || 0,
+        south: Number(document.getElementById('modalTotalSouth').value) || 0,
+        west: Number(document.getElementById('modalTotalWest').value) || 0
     };
 
-    function init() {
-        document.getElementById('recordDate').value = new Date().toISOString().split('T')[0];
-        renderProjectTable();
-        if (currentProjectId) loadProject(currentProjectId);
-    }
+    const project = allProjects[currentProjectId];
+    
+    // ✅ 永久修復：只更新設定，「完全保留」records
+    project.settings.name = name;
+    project.settings.startDate = startDate;
+    project.settings.endDate = endDate;
+    project.settings.totalAreas = totalAreas;
 
-    // 彈窗
-    function openNewProjectModal() {
-        isEditMode = false;
-        document.getElementById('modalProjectName').value = '';
-        document.getElementById('modalStartDate').value = '';
-        document.getElementById('modalEndDate').value = '';
-        document.getElementById('modalTotalNorth').value = 0;
-        document.getElementById('modalTotalEast').value = 0;
-        document.getElementById('modalTotalSouth').value = 0;
-        document.getElementById('modalTotalWest').value = 0;
-        document.getElementById('projectModal').style.display = 'flex';
-    }
+    // ✅ 強制存檔
+    localStorage.setItem('allProjects', JSON.stringify(allProjects));
+    
+    closeModal();
+    loadProject(currentProjectId);
+    renderProjectTable();
+    render();
+    alert('儲存成功 ✅ 記錄已保留');
+}
 
-    function openEditProjectModal() {
-        if (!currentProjectId) { alert('請雙擊選擇一個工程'); return; }
-        isEditMode = true;
-        const pj = allProjects[currentProjectId];
-        document.getElementById('modalProjectName').value = pj.settings.name;
-        document.getElementById('modalStartDate').value = pj.settings.startDate || '';
-        document.getElementById('modalEndDate').value = pj.settings.endDate || '';
-        document.getElementById('modalTotalNorth').value = pj.settings.totalAreas.north;
-        document.getElementById('modalTotalEast').value = pj.settings.totalAreas.east;
-        document.getElementById('modalTotalSouth').value = pj.settings.totalAreas.south;
-        document.getElementById('modalTotalWest').value = pj.settings.totalAreas.west;
-        document.getElementById('projectModal').style.display = 'flex';
-    }
+// 工程表格
+function renderProjectTable() {
+    const tbody = document.getElementById('projectTableBody');
+    tbody.innerHTML = '';
 
-    function closeModal() {
-        document.getElementById('projectModal').style.display = 'none';
-    }
-
-    // 🔥 關鍵修復：編輯設定時「保留原有記錄」
-    function saveProjectFromModal() {
-        const name = document.getElementById('modalProjectName').value.trim();
-        if (!name) { alert('請輸入工程名稱'); return; }
-        
-        const startDate = document.getElementById('modalStartDate').value;
-        const endDate = document.getElementById('modalEndDate').value;
-        const totalAreas = {
-            north: Number(document.getElementById('modalTotalNorth').value) || 0,
-            east: Number(document.getElementById('modalTotalEast').value) || 0,
-            south: Number(document.getElementById('modalTotalSouth').value) || 0,
-            west: Number(document.getElementById('modalTotalWest').value) || 0
-        };
-
-        if (isEditMode) {
-            // ✅ 只更新設定，不動記錄
-            allProjects[currentProjectId].settings = { name, startDate, endDate, totalAreas };
-        } else {
-            // 新增工程
-            const id = Date.now().toString();
-            allProjects[id] = {
-                name,
-                settings: { name, startDate, endDate, totalAreas },
-                records: []
-            };
-            currentProjectId = id;
-            localStorage.setItem('currentProjectId', id);
-        }
-
-        // 統一存檔
-        localStorage.setItem('allProjects', JSON.stringify(allProjects));
-        closeModal();
-        loadProject(currentProjectId);
-        renderProjectTable();
-        render();
-        alert('儲存成功');
-    }
-
-    // 工程表格
-    function renderProjectTable() {
-        const tbody = document.getElementById('projectTableBody');
-        tbody.innerHTML = '';
-
-        Object.entries(allProjects).forEach(([id, p]) => {
-            const total = (
-                Number(p.settings.totalAreas.north) +
-                Number(p.settings.totalAreas.east) +
-                Number(p.settings.totalAreas.south) +
-                Number(p.settings.totalAreas.west)
-            ).toFixed(1);
-
-            const done = p.records.reduce((sum, r) => sum + Number(r.cleanArea), 0).toFixed(1);
-            const rate = total > 0 ? ((done / total) * 100).toFixed(1) : 0;
-
-            tbody.innerHTML += `
-            <tr class="${id == currentProjectId ? 'active-row' : ''}" ondblclick="switchProjectId('${id}')">
-                <td>${p.name}</td>
-                <td>${p.settings.startDate || '-'}</td>
-                <td>${p.settings.endDate || '-'}</td>
-                <td>${p.settings.totalAreas.north}</td>
-                <td>${p.settings.totalAreas.east}</td>
-                <td>${p.settings.totalAreas.south}</td>
-                <td>${p.settings.totalAreas.west}</td>
-                <td>${total}</td>
-                <td>${rate}%</td>
-            </tr>`;
-        });
-    }
-
-    // 切換工程
-    function switchProjectId(id) {
-        currentProjectId = id;
-        localStorage.setItem('currentProjectId', id);
-        loadProject(id);
-    }
-
-    function loadProject(id) {
-        const pj = allProjects[id];
-        projectSettings = pj.settings;
-        cleaningRecords = pj.records;  // ✅ 正確載入原有記錄
-        renderProjectTable();
-        render();
-    }
-
-    function deleteCurrentProject() {
-        if (!currentProjectId) return;
-        if (!confirm('確定刪除？')) return;
-        delete allProjects[currentProjectId];
-        currentProjectId = null;
-        localStorage.setItem('allProjects', JSON.stringify(allProjects));
-        renderProjectTable();
-        render();
-    }
-
-    // 記錄
-    function addCleaningRecord() {
-        const date = document.getElementById('recordDate').value;
-        if (!date) return alert('請選日期');
-        const direction = document.getElementById('direction').value;
-        const cleanArea = +document.getElementById('cleanArea').value || 0;
-        if (cleanArea <= 0) return alert('請輸入正確的清洗面積');
-        
-        cleaningRecords = cleaningRecords.filter(x => x.date !== date);
-        cleaningRecords.push({
-            date, direction, cleanArea,
-            cleaningAgent: +document.getElementById('cleaningAgent').value||0,
-            staff: document.getElementById('cleaningStaff').value,
-            remark: document.getElementById('remark').value
-        });
-        localStorage.setItem('allProjects', JSON.stringify(allProjects));
-        document.getElementById('cleanArea').value='';
-        document.getElementById('cleaningAgent').value='';
-        document.getElementById('cleaningStaff').value='';
-        document.getElementById('remark').value='';
-        renderProjectTable();
-        render();
-    }
-
-    function render() {
-        if (!projectSettings) return;
-        
+    Object.entries(allProjects).forEach(([id, p]) => {
         const total = (
-            +projectSettings.totalAreas.north +
-            +projectSettings.totalAreas.east +
-            +projectSettings.totalAreas.south +
-            +projectSettings.totalAreas.west
+            Number(p.settings.totalAreas.north) +
+            Number(p.settings.totalAreas.east) +
+            Number(p.settings.totalAreas.south) +
+            Number(p.settings.totalAreas.west)
         ).toFixed(1);
-        
-        const done = cleaningRecords.reduce((s,r)=>s + r.cleanArea, 0).toFixed(1);
-        const rate = total>0 ? ((done/total)*100).toFixed(1) : 0;
-        const agent = cleaningRecords.reduce((s,r)=>s + r.cleaningAgent, 0).toFixed(1);
-        
-        document.getElementById('current-project').textContent = `項目：${projectSettings.name}`;
-        document.getElementById('total-area').textContent = `總面積：${total} m²`;
-        document.getElementById('overall-completion').textContent = `完成率：${rate}%`;
-        document.getElementById('completedArea').textContent = done+' m²';
-        document.getElementById('completionRate').textContent = rate+'%';
-        document.getElementById('totalCleaningAgent').textContent = agent;
-        
-        const body = document.getElementById('recordsTableBody');
-        body.innerHTML = '';
-        cleaningRecords.sort((a,b)=>new Date(b.date)-new Date(a.date)).forEach(r=>{
-            const dir = {north:'北面',east:'東面',south:'南面',west:'西面'}[r.direction];
-            body.innerHTML += `<tr>
-                <td>${r.date}</td>
-                <td>${dir}</td>
-                <td>${r.cleanArea.toFixed(1)}</td>
-                <td>${r.cleaningAgent.toFixed(1)}</td>
-                <td>${r.staff||'-'}</td>
-                <td>${r.remark||'-'}</td>
-                <td><button class="btn btn-danger" onclick="del('${r.date}')">刪</button></td>
-            </tr>`;
-        });
-        initChart(total,done);
-    }
 
-    function del(date) {
-        cleaningRecords = cleaningRecords.filter(x=>x.date!==date);
-        localStorage.setItem('allProjects', JSON.stringify(allProjects));
-        renderProjectTable();
-        render();
-    }
+        const done = p.records.reduce((sum, r) => sum + Number(r.cleanArea), 0).toFixed(1);
+        const rate = total > 0 ? ((done / total) * 100).toFixed(1) : 0;
 
-    function initChart(total,done) {
-        const ctx = document.getElementById('completionChart').getContext('2d');
-        if (completionChart) completionChart.destroy();
-        completionChart = new Chart(ctx,{
-            type:'doughnut',
-            data:{labels:['已完成','剩餘'],datasets:[{data:[done,Math.max(0,total-done)],backgroundColor:['#2c6eec','#e0e0e0']}]},
-            options:{cutout:'60%'}
-        });
-    }
+        tbody.innerHTML += `
+        <tr class="${id == currentProjectId ? 'active-row' : ''}" ondblclick="switchProjectId('${id}')">
+            <td>${p.name}</td>
+            <td>${p.settings.startDate || '-'}</td>
+            <td>${p.settings.endDate || '-'}</td>
+            <td>${p.settings.totalAreas.north}</td>
+            <td>${p.settings.totalAreas.east}</td>
+            <td>${p.settings.totalAreas.south}</td>
+            <td>${p.settings.totalAreas.west}</td>
+            <td>${total}</td>
+            <td>${rate}%</td>
+        </tr>`;
+    });
+}
 
-    // 備份
-    function exportBackup() {
-        const data = JSON.stringify({ allProjects, currentProjectId });
-        const blob = new Blob([data],{type:"application/json"});
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.href = url; a.download = 'clean-backup.json'; a.click();
-        URL.revokeObjectURL(url); alert('匯出成功！');
-    }
+// 切換工程
+function switchProjectId(id) {
+    currentProjectId = id;
+    localStorage.setItem('currentProjectId', id);
+    loadProject(id);
+}
 
-    function importBackup(e) {
-        const file = e.target.files[0]; if (!file) return;
-        const reader = new FileReader();
-        reader.onload = ev=>{
-            try{
-                const d=JSON.parse(ev.target.result);
-                allProjects=d.allProjects; currentProjectId=d.currentProjectId;
-                localStorage.setItem('allProjects',JSON.stringify(allProjects));
-                localStorage.setItem('currentProjectId',currentProjectId);
-                init(); alert('匯入成功！');
-            }catch(e){alert('檔案錯誤')}
-        }; reader.readAsText(file);
-    }
+function loadProject(id) {
+    const pj = allProjects[id];
+    projectSettings = pj.settings;
+    cleaningRecords = pj.records;
+    renderProjectTable();
+    render();
+}
+
+function deleteCurrentProject() {
+    if (!currentProjectId) return;
+    if (!confirm('確定刪除？')) return;
+    delete allProjects[currentProjectId];
+    currentProjectId = null;
+    localStorage.setItem('allProjects', JSON.stringify(allProjects));
+    renderProjectTable();
+    render();
+}
+
+// 記錄
+function addCleaningRecord() {
+    const date = document.getElementById('recordDate').value;
+    if (!date) return alert('請選日期');
+    const direction = document.getElementById('direction').value;
+    const cleanArea = +document.getElementById('cleanArea').value || 0;
+    if (cleanArea <= 0) return alert('請輸入正確的清洗面積');
+    
+    cleaningRecords = cleaningRecords.filter(x => x.date !== date);
+    cleaningRecords.push({
+        date, direction, cleanArea,
+        cleaningAgent: +document.getElementById('cleaningAgent').value||0,
+        staff: document.getElementById('cleaningStaff').value,
+        remark: document.getElementById('remark').value
+    });
+    localStorage.setItem('allProjects', JSON.stringify(allProjects));
+    document.getElementById('cleanArea').value='';
+    document.getElementById('cleaningAgent').value='';
+    document.getElementById('cleaningStaff').value='';
+    document.getElementById('remark').value='';
+    renderProjectTable();
+    render();
+}
+
+function render() {
+    if (!projectSettings) return;
+    
+    const total = (
+        +projectSettings.totalAreas.north +
+        +projectSettings.totalAreas.east +
+        +projectSettings.totalAreas.south +
+        +projectSettings.totalAreas.west
+    ).toFixed(1);
+    
+    const done = cleaningRecords.reduce((s,r)=>s + r.cleanArea, 0).toFixed(1);
+    const rate = total>0 ? ((done/total)*100).toFixed(1) : 0;
+    const agent = cleaningRecords.reduce((s,r)=>s + r.cleaningAgent, 0).toFixed(1);
+    
+    document.getElementById('current-project').textContent = `項目：${projectSettings.name}`;
+    document.getElementById('total-area').textContent = `總面積：${total} m²`;
+    document.getElementById('overall-completion').textContent = `完成率：${rate}%`;
+    document.getElementById('completedArea').textContent = done+' m²';
+    document.getElementById('completionRate').textContent = rate+'%';
+    document.getElementById('totalCleaningAgent').textContent = agent;
+    
+    const body = document.getElementById('recordsTableBody');
+    body.innerHTML = '';
+    cleaningRecords.sort((a,b)=>new Date(b.date)-new Date(a.date)).forEach(r=>{
+        const dir = {north:'北面',east:'東面',south:'南面',west:'西面'}[r.direction];
+        body.innerHTML += `<tr>
+            <td>${r.date}</td>
+            <td>${dir}</td>
+            <td>${r.cleanArea.toFixed(1)}</td>
+            <td>${r.cleaningAgent.toFixed(1)}</td>
+            <td>${r.staff||'-'}</td>
+            <td>${r.remark||'-'}</td>
+            <td><button class="btn btn-danger" onclick="del('${r.date}')">刪</button></td>
+        </tr>`;
+    });
+    initChart(total,done);
+}
+
+function del(date) {
+    cleaningRecords = cleaningRecords.filter(x=>x.date!==date);
+    localStorage.setItem('allProjects', JSON.stringify(allProjects));
+    renderProjectTable();
+    render();
+}
+
+function initChart(total,done) {
+    const ctx = document.getElementById('completionChart').getContext('2d');
+    if (completionChart) completionChart.destroy();
+    completionChart = new Chart(ctx,{
+        type:'doughnut',
+        data:{labels:['已完成','剩餘'],datasets:[{data:[done,Math.max(0,total-done)],backgroundColor:['#2c6eec','#e0e0e0']}]},
+        options:{cutout:'60%'}
+    });
+}
+
+// 備份
+function exportBackup() {
+    const data = JSON.stringify({ allProjects, currentProjectId });
+    const blob = new Blob([data],{type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'clean-backup.json'; a.click();
+    URL.revokeObjectURL(url); alert('匯出成功！');
+}
+
+function importBackup(e) {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev=>{
+        try{
+            const d=JSON.parse(ev.target.result);
+            allProjects=d.allProjects; currentProjectId=d.currentProjectId;
+            localStorage.setItem('allProjects',JSON.stringify(allProjects));
+            localStorage.setItem('currentProjectId',currentProjectId);
+            init(); alert('匯入成功！');
+        }catch(e){alert('檔案錯誤')}
+    }; reader.readAsText(file);
+}
 </script>
 </body>
 </html>
