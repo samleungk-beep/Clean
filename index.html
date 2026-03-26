@@ -472,7 +472,7 @@
             allProjects[currentProjectId].settings = { name, startDate, endDate, totalAreas };
             saveAll();
             loadProject(currentProjectId);
-            renderProjectInfoTable(); // 關鍵修復：強制刷新工程資訊表格
+            renderProjectInfoTable();
         } else {
             const id = Date.now().toString();
             allProjects[id] = { name, settings: { name, startDate, endDate, totalAreas }, records: [] };
