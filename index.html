@@ -208,7 +208,7 @@
 </head>
 <body>
 
-<!-- 項目設定彈窗 → 有開始日期 + 完成日期 + 四面面積 -->
+<!-- 項目設定彈窗 -->
 <div class="modal-overlay" id="projectModal">
     <div class="modal-content">
         <div class="modal-header">
@@ -267,7 +267,6 @@
             <button class="btn btn-danger" onclick="deleteCurrentProject()">刪除工程</button>
         </div>
 
-        <!-- 你要的工程表格 -->
         <div class="table-container">
             <table>
                 <thead>
@@ -393,7 +392,7 @@
         document.getElementById('projectModal').style.display = 'none';
     }
 
-    // 儲存工程（可編輯日期、面積、名稱）
+    // 🔥 關鍵修復：編輯設定時「保留原有記錄」
     function saveProjectFromModal() {
         const name = document.getElementById('modalProjectName').value.trim();
         if (!name) { alert('請輸入工程名稱'); return; }
@@ -408,22 +407,24 @@
         };
 
         if (isEditMode) {
+            // ✅ 只更新設定，不動記錄
             allProjects[currentProjectId].settings = { name, startDate, endDate, totalAreas };
-            localStorage.setItem('allProjects', JSON.stringify(allProjects));
-            loadProject(currentProjectId);
         } else {
+            // 新增工程
             const id = Date.now().toString();
             allProjects[id] = {
                 name,
                 settings: { name, startDate, endDate, totalAreas },
                 records: []
             };
-            localStorage.setItem('allProjects', JSON.stringify(allProjects));
             currentProjectId = id;
             localStorage.setItem('currentProjectId', id);
         }
 
+        // 統一存檔
+        localStorage.setItem('allProjects', JSON.stringify(allProjects));
         closeModal();
+        loadProject(currentProjectId);
         renderProjectTable();
         render();
         alert('儲存成功');
@@ -470,7 +471,7 @@
     function loadProject(id) {
         const pj = allProjects[id];
         projectSettings = pj.settings;
-        cleaningRecords = pj.records;
+        cleaningRecords = pj.records;  // ✅ 正確載入原有記錄
         renderProjectTable();
         render();
     }
