@@ -367,9 +367,7 @@
         document.getElementById('projectModal').style.display = 'none';
     }
 
-    // ======================
-    // 🔥 這裡是唯一修復的地方
-    // ======================
+    // 儲存專案設定（已修復，不會刪除記錄）
     function saveProjectFromModal() {
         const name = document.getElementById('modalProjectName').value.trim();
         if (!name) { alert('請輸入項目名稱'); return; }
@@ -381,14 +379,19 @@
         };
 
         if (isEditMode) {
-            // 編輯現有工程
-            allProjects[currentProjectId].settings = { name, totalAreas };
+            // 編輯：只更新設定，保留記錄
+            allProjects[currentProjectId].settings.name = name;
+            allProjects[currentProjectId].settings.totalAreas = totalAreas;
             localStorage.setItem('allProjects', JSON.stringify(allProjects));
             loadProject(currentProjectId);
         } else {
-            // 新增工程
+            // 新增
             const id = Date.now().toString();
-            allProjects[id] = { name, settings: { name, totalAreas }, records: [] };
+            allProjects[id] = { 
+                name, 
+                settings: { name, totalAreas }, 
+                records: [] 
+            };
             localStorage.setItem('allProjects', JSON.stringify(allProjects));
             currentProjectId = id;
             localStorage.setItem('currentProjectId', id);
@@ -400,13 +403,21 @@
     }
 
     // 工程管理
-    function switchProject() { switchProjectId(document.getElementById('currentProjectSelect').value); }
-    function switchProjectId(id) { currentProjectId = id; localStorage.setItem('currentProjectId', id); loadProject(id); }
+    function switchProject() {
+        switchProjectId(document.getElementById('currentProjectSelect').value);
+    }
+
+    function switchProjectId(id) {
+        currentProjectId = id;
+        localStorage.setItem('currentProjectId', id);
+        loadProject(id);
+    }
 
     function loadProject(id) {
+        if (!id || !allProjects[id]) return;
         const pj = allProjects[id];
         projectSettings = pj.settings;
-        cleaningRecords = pj.records;
+        cleaningRecords = pj.records; // 讀取該工程的記錄
         render();
     }
 
@@ -429,28 +440,60 @@
         });
     }
 
-    // 記錄操作
+    // ==============================
+    // ✅ 已修復：新增記錄真正存入工程
+    // ==============================
     function addCleaningRecord() {
+        if (!currentProjectId || !allProjects[currentProjectId]) {
+            alert("請先選擇一個工程！");
+            return;
+        }
+
         const date = document.getElementById('recordDate').value;
         if (!date) return alert('請選日期');
+        
         const direction = document.getElementById('direction').value;
         const cleanArea = +document.getElementById('cleanArea').value || 0;
         if (cleanArea <= 0) return alert('請輸入正確的清洗面積');
-        
-        cleaningRecords = cleaningRecords.filter(x => x.date !== date);
-        cleaningRecords.push({
+
+        const newRecord = {
             date,
-            direction: direction,
-            cleanArea: cleanArea,
-            cleaningAgent: +document.getElementById('cleaningAgent').value||0,
+            direction,
+            cleanArea,
+            cleaningAgent: +document.getElementById('cleaningAgent').value || 0,
             staff: document.getElementById('cleaningStaff').value,
             remark: document.getElementById('remark').value
-        });
+        };
+
+        // 🔥 關鍵修復：先移除同日期舊記錄
+        let project = allProjects[currentProjectId];
+        project.records = project.records.filter(x => x.date !== date);
+        project.records.push(newRecord);
+
+        // 🔥 關鍵修復：同步更新全域變數
+        cleaningRecords = project.records;
+
+        // 儲存到本機
         localStorage.setItem('allProjects', JSON.stringify(allProjects));
-        document.getElementById('cleanArea').value='';
-        document.getElementById('cleaningAgent').value='';
-        document.getElementById('cleaningStaff').value='';
-        document.getElementById('remark').value='';
+
+        // 清空表單
+        document.getElementById('cleanArea').value = '';
+        document.getElementById('cleaningAgent').value = '';
+        document.getElementById('cleaningStaff').value = '';
+        document.getElementById('remark').value = '';
+
+        render();
+    }
+
+    // ==============================
+    // ✅ 已修復：刪除記錄也同步存檔
+    // ==============================
+    function del(date) {
+        if (!currentProjectId) return;
+        let project = allProjects[currentProjectId];
+        project.records = project.records.filter(x => x.date !== date);
+        cleaningRecords = project.records;
+        localStorage.setItem('allProjects', JSON.stringify(allProjects));
         render();
     }
 
@@ -485,12 +528,6 @@
             </tr>`;
         });
         initChart(total,done);
-    }
-
-    function del(date) {
-        cleaningRecords = cleaningRecords.filter(x=>x.date!==date);
-        localStorage.setItem('allProjects', JSON.stringify(allProjects));
-        render();
     }
 
     function initChart(total,done) {
