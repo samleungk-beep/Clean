@@ -108,17 +108,18 @@
         }
         .table-container {
             overflow-x: auto;
-            margin-top: 20px;
+            margin-top: 15px;
         }
         table {
             width: 100%;
             border-collapse: collapse;
-            min-width: 800px;
+            min-width: 900px;
         }
         th, td {
-            padding: 12px 15px;
+            padding: 8px 10px;
             text-align: left;
             border-bottom: 1px solid #ddd;
+            font-size: 0.95em;
         }
         th {
             background-color: #2c6eec;
@@ -145,14 +146,6 @@
         .completion-chart {
             height: 300px;
             margin-top: 20px;
-        }
-        .project-list-item {
-            padding: 10px;
-            border-bottom: 1px solid #eee;
-            cursor: pointer;
-        }
-        .project-list-item.active {
-            background-color: #e3f2fd;
         }
         .main-container {
             display: grid;
@@ -205,30 +198,42 @@
             gap: 10px;
             margin-top: 20px;
         }
+        tr.active-row {
+            background-color: #e3f2fd;
+            font-weight: bold;
+        }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
-<!-- 項目設定彈窗 -->
+<!-- 項目設定彈窗 → 有開始日期 + 完成日期 + 四面面積 -->
 <div class="modal-overlay" id="projectModal">
     <div class="modal-content">
         <div class="modal-header">
-            <h2><i class="fas fa-cog"></i> 項目設定</h2>
+            <h2><i class="fas fa-cog"></i> 工程設定</h2>
             <button class="modal-close" onclick="closeModal()">&times;</button>
         </div>
         <div class="form-group">
-            <label>項目名稱</label>
+            <label>工程名稱</label>
             <input type="text" id="modalProjectName">
+        </div>
+        <div class="form-group">
+            <label>開始日期</label>
+            <input type="date" id="modalStartDate">
+        </div>
+        <div class="form-group">
+            <label>完成日期</label>
+            <input type="date" id="modalEndDate">
         </div>
         <div class="form-group">
             <label>總面積 (m²)</label>
             <div class="area-inputs">
-                <div><label>北向</label><input type="number" id="modalTotalNorth"></div>
-                <div><label>東向</label><input type="number" id="modalTotalEast"></div>
-                <div><label>南向</label><input type="number" id="modalTotalSouth"></div>
-                <div><label>西向</label><input type="number" id="modalTotalWest"></div>
+                <div><label>北面</label><input type="number" id="modalTotalNorth"></div>
+                <div><label>東面</label><input type="number" id="modalTotalEast"></div>
+                <div><label>南面</label><input type="number" id="modalTotalSouth"></div>
+                <div><label>西面</label><input type="number" id="modalTotalWest"></div>
             </div>
         </div>
         <div class="modal-footer">
@@ -253,21 +258,38 @@
         </div>
     </div>
 
+    <!-- 工程管理 + 表格 -->
     <div class="card">
         <div class="card-header"><h2><i class="fas fa-folder-open"></i> 工程管理</h2></div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
-            <input type="text" id="newProjectName" placeholder="新工程名稱" style="flex:1;min-width:200px;">
+        <div style="display:flex;gap:10px;flex-wrap:wrap; margin-bottom:10px;">
             <button class="btn btn-primary" onclick="openNewProjectModal()">新增工程</button>
-            <select id="currentProjectSelect" onchange="switchProject()" style="flex:1;min-width:200px;"></select>
+            <button class="btn btn-primary" onclick="openEditProjectModal()">編輯設定</button>
             <button class="btn btn-danger" onclick="deleteCurrentProject()">刪除工程</button>
-            <button class="btn btn-primary" onclick="openEditProjectModal()" style="margin-left:auto;">編輯設定</button>
         </div>
-        <div id="projectList" style="margin-top:15px;max-height:200px;overflow-y:auto;border:1px solid #ddd;border-radius:5px;"></div>
+
+        <!-- 你要的工程表格 -->
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>工程名稱</th>
+                        <th>開始日期</th>
+                        <th>完成日期</th>
+                        <th>北面</th>
+                        <th>東面</th>
+                        <th>南面</th>
+                        <th>西面</th>
+                        <th>總面積</th>
+                        <th>完成度</th>
+                    </tr>
+                </thead>
+                <tbody id="projectTableBody"></tbody>
+            </table>
+        </div>
     </div>
 
     <div class="main-container">
         <div class="left-column">
-            <!-- 進度統計現在佔據左側整個卡片 -->
             <div class="card">
                 <div class="card-header"><h2><i class="fas fa-chart-pie"></i> 進度統計</h2></div>
                 <div class="summary-stats">
@@ -286,10 +308,10 @@
                     <div class="form-group">
                         <label>方向</label>
                         <select id="direction">
-                            <option value="north">北向</option>
-                            <option value="east">東向</option>
-                            <option value="south">南向</option>
-                            <option value="west">西向</option>
+                            <option value="north">北面</option>
+                            <option value="east">東面</option>
+                            <option value="south">南面</option>
+                            <option value="west">西面</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -336,14 +358,16 @@
 
     function init() {
         document.getElementById('recordDate').value = new Date().toISOString().split('T')[0];
-        initProjectList();
+        renderProjectTable();
         if (currentProjectId) loadProject(currentProjectId);
     }
 
-    // 彈窗控制
+    // 彈窗
     function openNewProjectModal() {
         isEditMode = false;
         document.getElementById('modalProjectName').value = '';
+        document.getElementById('modalStartDate').value = '';
+        document.getElementById('modalEndDate').value = '';
         document.getElementById('modalTotalNorth').value = 0;
         document.getElementById('modalTotalEast').value = 0;
         document.getElementById('modalTotalSouth').value = 0;
@@ -352,10 +376,12 @@
     }
 
     function openEditProjectModal() {
-        if (!currentProjectId) { alert('請先選擇一個工程'); return; }
+        if (!currentProjectId) { alert('請雙擊選擇一個工程'); return; }
         isEditMode = true;
         const pj = allProjects[currentProjectId];
         document.getElementById('modalProjectName').value = pj.settings.name;
+        document.getElementById('modalStartDate').value = pj.settings.startDate || '';
+        document.getElementById('modalEndDate').value = pj.settings.endDate || '';
         document.getElementById('modalTotalNorth').value = pj.settings.totalAreas.north;
         document.getElementById('modalTotalEast').value = pj.settings.totalAreas.east;
         document.getElementById('modalTotalSouth').value = pj.settings.totalAreas.south;
@@ -367,12 +393,13 @@
         document.getElementById('projectModal').style.display = 'none';
     }
 
-    // ======================
-    // 🔥 這裡是唯一修復的地方
-    // ======================
+    // 儲存工程（可編輯日期、面積、名稱）
     function saveProjectFromModal() {
         const name = document.getElementById('modalProjectName').value.trim();
-        if (!name) { alert('請輸入項目名稱'); return; }
+        if (!name) { alert('請輸入工程名稱'); return; }
+        
+        const startDate = document.getElementById('modalStartDate').value;
+        const endDate = document.getElementById('modalEndDate').value;
         const totalAreas = {
             north: Number(document.getElementById('modalTotalNorth').value) || 0,
             east: Number(document.getElementById('modalTotalEast').value) || 0,
@@ -381,55 +408,84 @@
         };
 
         if (isEditMode) {
-            // 編輯現有工程
-            allProjects[currentProjectId].settings = { name, totalAreas };
+            allProjects[currentProjectId].settings = { name, startDate, endDate, totalAreas };
             localStorage.setItem('allProjects', JSON.stringify(allProjects));
             loadProject(currentProjectId);
         } else {
-            // 新增工程
             const id = Date.now().toString();
-            allProjects[id] = { name, settings: { name, totalAreas }, records: [] };
+            allProjects[id] = {
+                name,
+                settings: { name, startDate, endDate, totalAreas },
+                records: []
+            };
             localStorage.setItem('allProjects', JSON.stringify(allProjects));
             currentProjectId = id;
             localStorage.setItem('currentProjectId', id);
         }
+
         closeModal();
-        initProjectList();
+        renderProjectTable();
         render();
         alert('儲存成功');
     }
 
-    // 工程管理
-    function switchProject() { switchProjectId(document.getElementById('currentProjectSelect').value); }
-    function switchProjectId(id) { currentProjectId = id; localStorage.setItem('currentProjectId', id); loadProject(id); }
+    // 工程表格
+    function renderProjectTable() {
+        const tbody = document.getElementById('projectTableBody');
+        tbody.innerHTML = '';
+
+        Object.entries(allProjects).forEach(([id, p]) => {
+            const total = (
+                Number(p.settings.totalAreas.north) +
+                Number(p.settings.totalAreas.east) +
+                Number(p.settings.totalAreas.south) +
+                Number(p.settings.totalAreas.west)
+            ).toFixed(1);
+
+            const done = p.records.reduce((sum, r) => sum + Number(r.cleanArea), 0).toFixed(1);
+            const rate = total > 0 ? ((done / total) * 100).toFixed(1) : 0;
+
+            tbody.innerHTML += `
+            <tr class="${id == currentProjectId ? 'active-row' : ''}" ondblclick="switchProjectId('${id}')">
+                <td>${p.name}</td>
+                <td>${p.settings.startDate || '-'}</td>
+                <td>${p.settings.endDate || '-'}</td>
+                <td>${p.settings.totalAreas.north}</td>
+                <td>${p.settings.totalAreas.east}</td>
+                <td>${p.settings.totalAreas.south}</td>
+                <td>${p.settings.totalAreas.west}</td>
+                <td>${total}</td>
+                <td>${rate}%</td>
+            </tr>`;
+        });
+    }
+
+    // 切換工程
+    function switchProjectId(id) {
+        currentProjectId = id;
+        localStorage.setItem('currentProjectId', id);
+        loadProject(id);
+    }
 
     function loadProject(id) {
         const pj = allProjects[id];
         projectSettings = pj.settings;
         cleaningRecords = pj.records;
+        renderProjectTable();
         render();
     }
 
     function deleteCurrentProject() {
         if (!currentProjectId) return;
+        if (!confirm('確定刪除？')) return;
         delete allProjects[currentProjectId];
         currentProjectId = null;
         localStorage.setItem('allProjects', JSON.stringify(allProjects));
+        renderProjectTable();
         render();
     }
 
-    function initProjectList() {
-        const sel = document.getElementById('currentProjectSelect');
-        const list = document.getElementById('projectList');
-        sel.innerHTML = '<option value="">請選擇工程</option>';
-        list.innerHTML = '';
-        Object.entries(allProjects).forEach(([id,p]) => {
-            sel.innerHTML += `<option value="${id}" ${id==currentProjectId?'selected':''}>${p.name}</option>`;
-            list.innerHTML += `<div class="project-list-item ${id==currentProjectId?'active':''}" ondblclick="switchProjectId('${id}')">${p.name} (${p.records.length} 筆)</div>`;
-        });
-    }
-
-    // 記錄操作
+    // 記錄
     function addCleaningRecord() {
         const date = document.getElementById('recordDate').value;
         if (!date) return alert('請選日期');
@@ -439,9 +495,7 @@
         
         cleaningRecords = cleaningRecords.filter(x => x.date !== date);
         cleaningRecords.push({
-            date,
-            direction: direction,
-            cleanArea: cleanArea,
+            date, direction, cleanArea,
             cleaningAgent: +document.getElementById('cleaningAgent').value||0,
             staff: document.getElementById('cleaningStaff').value,
             remark: document.getElementById('remark').value
@@ -451,19 +505,25 @@
         document.getElementById('cleaningAgent').value='';
         document.getElementById('cleaningStaff').value='';
         document.getElementById('remark').value='';
+        renderProjectTable();
         render();
     }
 
     function render() {
-        initProjectList();
         if (!projectSettings) return;
         
-        const total = (+projectSettings.totalAreas.north + +projectSettings.totalAreas.east + +projectSettings.totalAreas.south + +projectSettings.totalAreas.west).toFixed(1);
+        const total = (
+            +projectSettings.totalAreas.north +
+            +projectSettings.totalAreas.east +
+            +projectSettings.totalAreas.south +
+            +projectSettings.totalAreas.west
+        ).toFixed(1);
+        
         const done = cleaningRecords.reduce((s,r)=>s + r.cleanArea, 0).toFixed(1);
         const rate = total>0 ? ((done/total)*100).toFixed(1) : 0;
         const agent = cleaningRecords.reduce((s,r)=>s + r.cleaningAgent, 0).toFixed(1);
         
-        document.getElementById('current-project').textContent = `項目：${projectSettings.name||'未設定'}`;
+        document.getElementById('current-project').textContent = `項目：${projectSettings.name}`;
         document.getElementById('total-area').textContent = `總面積：${total} m²`;
         document.getElementById('overall-completion').textContent = `完成率：${rate}%`;
         document.getElementById('completedArea').textContent = done+' m²';
@@ -473,10 +533,10 @@
         const body = document.getElementById('recordsTableBody');
         body.innerHTML = '';
         cleaningRecords.sort((a,b)=>new Date(b.date)-new Date(a.date)).forEach(r=>{
-            const directionName = { north:'北向', east:'東向', south:'南向', west:'西向' }[r.direction];
+            const dir = {north:'北面',east:'東面',south:'南面',west:'西面'}[r.direction];
             body.innerHTML += `<tr>
                 <td>${r.date}</td>
-                <td>${directionName}</td>
+                <td>${dir}</td>
                 <td>${r.cleanArea.toFixed(1)}</td>
                 <td>${r.cleaningAgent.toFixed(1)}</td>
                 <td>${r.staff||'-'}</td>
@@ -490,6 +550,7 @@
     function del(date) {
         cleaningRecords = cleaningRecords.filter(x=>x.date!==date);
         localStorage.setItem('allProjects', JSON.stringify(allProjects));
+        renderProjectTable();
         render();
     }
 
@@ -503,35 +564,27 @@
         });
     }
 
-    // 備份還原
+    // 備份
     function exportBackup() {
         const data = JSON.stringify({ allProjects, currentProjectId });
         const blob = new Blob([data],{type:"application/json"});
         const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'clean-backup.json';
-        a.click();
-        URL.revokeObjectURL(url);
-        alert('匯出成功！');
+        const a = document.createElement('a'); a.href = url; a.download = 'clean-backup.json'; a.click();
+        URL.revokeObjectURL(url); alert('匯出成功！');
     }
 
     function importBackup(e) {
-        const file = e.target.files[0];
-        if (!file) return;
+        const file = e.target.files[0]; if (!file) return;
         const reader = new FileReader();
         reader.onload = ev=>{
             try{
-                const data = JSON.parse(ev.target.result);
-                allProjects = data.allProjects;
-                currentProjectId = data.currentProjectId;
+                const d=JSON.parse(ev.target.result);
+                allProjects=d.allProjects; currentProjectId=d.currentProjectId;
                 localStorage.setItem('allProjects',JSON.stringify(allProjects));
                 localStorage.setItem('currentProjectId',currentProjectId);
-                init();
-                alert('匯入成功！');
+                init(); alert('匯入成功！');
             }catch(e){alert('檔案錯誤')}
-        };
-        reader.readAsText(file);
+        }; reader.readAsText(file);
     }
 </script>
 </body>
