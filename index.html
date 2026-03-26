@@ -79,15 +79,12 @@
             border-radius: 5px;
             font-size: 1em;
         }
-        .area-inputs {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
+        .direction-area-row {
+            display: flex;
             gap: 10px;
         }
-        @media (max-width: 576px) {
-            .area-inputs {
-                grid-template-columns: 1fr;
-            }
+        .direction-area-row .form-group {
+            flex: 1;
         }
         .btn {
             padding: 10px 20px;
@@ -122,15 +119,6 @@
             background-color: #2c6eec;
             color: white;
         }
-        .status-badge {
-            padding: 3px 8px;
-            border-radius: 20px;
-            font-size: 0.85em;
-            font-weight: bold;
-        }
-        .status-completed { background-color: #e6f7e6; color: #009900; }
-        .status-in-progress { background-color: #fff3cd; color: #cc9900; }
-        .status-pending { background-color: #ffebee; color: #cc0000; }
         .summary-stats {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -215,12 +203,7 @@
                     </div>
                     <div class="form-group">
                         <label>總面積 (m²)</label>
-                        <div class="area-inputs">
-                            <div><label>北向</label><input type="number" id="totalNorth"></div>
-                            <div><label>東向</label><input type="number" id="totalEast"></div>
-                            <div><label>南向</label><input type="number" id="totalSouth"></div>
-                            <div><label>西向</label><input type="number" id="totalWest"></div>
-                        </div>
+                        <input type="number" id="totalArea" placeholder="請輸入專案總面積">
                     </div>
                     <button class="btn btn-primary" onclick="saveProjectSettings()">儲存設定</button>
                 </div>
@@ -228,24 +211,25 @@
                 <div class="card">
                     <div class="card-header"><h2><i class="fas fa-plus-circle"></i> 新增記錄</h2></div>
                     <div class="form-group"><label>日期</label><input type="date" id="recordDate"></div>
-                    <div class="form-group">
-                        <label>當日清潔面積</label>
-                        <div class="area-inputs">
-                            <div><label>北向</label><input type="number" id="areaNorth"></div>
-                            <div><label>東向</label><input type="number" id="areaEast"></div>
-                            <div><label>南向</label><input type="number" id="areaSouth"></div>
-                            <div><label>西向</label><input type="number" id="areaWest"></div>
+                    
+                    <div class="direction-area-row">
+                        <div class="form-group">
+                            <label>方向</label>
+                            <select id="direction">
+                                <option value="north">北向</option>
+                                <option value="east">東向</option>
+                                <option value="south">南向</option>
+                                <option value="west">西向</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>清洗面積 (m²)</label>
+                            <input type="number" id="cleanArea" placeholder="請輸入清洗面積">
                         </div>
                     </div>
+
                     <div class="form-group"><label>清潔劑</label><input type="number" id="cleaningAgent"></div>
                     <div class="form-group"><label>負責人</label><input type="text" id="cleaningStaff"></div>
-                    <div class="form-group"><label>狀態</label>
-                        <select id="workStatus">
-                            <option value="pending">待開始</option>
-                            <option value="in-progress">進行中</option>
-                            <option value="completed">已完成</option>
-                        </select>
-                    </div>
                     <div class="form-group"><label>備註</label><textarea id="remark" rows="3"></textarea></div>
                     <button class="btn btn-primary" onclick="addCleaningRecord()">新增記錄</button>
                 </div>
@@ -266,8 +250,13 @@
                     <div class="card-header"><h2><i class="fas fa-list-alt"></i> 記錄列表</h2></div>
                     <div class="table-container">
                         <table><thead><tr>
-                            <th>日期</th><th>北向</th><th>東向</th><th>南向</th><th>西向</th>
-                            <th>清潔劑</th><th>負責人</th><th>狀態</th><th>操作</th>
+                            <th>日期</th>
+                            <th>面向街道</th>
+                            <th>清洗面積 (m²)</th>
+                            <th>清潔劑</th>
+                            <th>負責人</th>
+                            <th>備註</th>
+                            <th>操作</th>
                         </tr></thead><tbody id="recordsTableBody"></tbody></table>
                     </div>
                 </div>
@@ -280,7 +269,6 @@
         let currentProjectId = localStorage.getItem('currentProjectId') || null;
         let cleaningRecords = [], projectSettings = {}, completionChart;
 
-        // 頁面載入直接執行
         window.onload = function() {
             init();
         };
@@ -295,7 +283,7 @@
             const name = document.getElementById('newProjectName').value.trim();
             if (!name) return alert('請輸入名稱');
             const id = Date.now().toString();
-            allProjects[id] = { name, settings: { name, totalAreas: { north:0,east:0,south:0,west:0 } }, records: [] };
+            allProjects[id] = { name, settings: { name, totalArea: 0 }, records: [] };
             saveAll();
             document.getElementById('newProjectName').value = '';
             initProjectList();
@@ -333,14 +321,8 @@
 
         function saveProjectSettings() {
             const name = document.getElementById('projectName').value;
-            projectSettings = {
-                name, totalAreas: {
-                    north: +document.getElementById('totalNorth').value||0,
-                    east: +document.getElementById('totalEast').value||0,
-                    south: +document.getElementById('totalSouth').value||0,
-                    west: +document.getElementById('totalWest').value||0
-                }
-            };
+            const totalArea = +document.getElementById('totalArea').value || 0;
+            projectSettings = { name, totalArea };
             saveAll();
             render();
             alert('儲存成功');
@@ -349,24 +331,21 @@
         function addCleaningRecord() {
             const date = document.getElementById('recordDate').value;
             if (!date) return alert('請選日期');
+            const direction = document.getElementById('direction').value;
+            const cleanArea = +document.getElementById('cleanArea').value || 0;
+            if (cleanArea <= 0) return alert('請輸入正確的清洗面積');
+            
             cleaningRecords = cleaningRecords.filter(x => x.date !== date);
             cleaningRecords.push({
-                date, areas: {
-                    north: +document.getElementById('areaNorth').value||0,
-                    east: +document.getElementById('areaEast').value||0,
-                    south: +document.getElementById('areaSouth').value||0,
-                    west: +document.getElementById('areaWest').value||0
-                },
+                date,
+                direction: direction,
+                cleanArea: cleanArea,
                 cleaningAgent: +document.getElementById('cleaningAgent').value||0,
                 staff: document.getElementById('cleaningStaff').value,
-                status: document.getElementById('workStatus').value,
                 remark: document.getElementById('remark').value
             });
             saveAll();
-            document.getElementById('areaNorth').value='';
-            document.getElementById('areaEast').value='';
-            document.getElementById('areaSouth').value='';
-            document.getElementById('areaWest').value='';
+            document.getElementById('cleanArea').value='';
             document.getElementById('cleaningAgent').value='';
             document.getElementById('cleaningStaff').value='';
             document.getElementById('remark').value='';
@@ -377,33 +356,31 @@
             initProjectList();
             if (!projectSettings) return;
             document.getElementById('projectName').value = projectSettings.name || '';
-            document.getElementById('totalNorth').value = projectSettings.totalAreas.north;
-            document.getElementById('totalEast').value = projectSettings.totalAreas.east;
-            document.getElementById('totalSouth').value = projectSettings.totalAreas.south;
-            document.getElementById('totalWest').value = projectSettings.totalAreas.west;
-            const total = (+projectSettings.totalAreas.north + +projectSettings.totalAreas.east + +projectSettings.totalAreas.south + +projectSettings.totalAreas.west).toFixed(1);
-            const done = cleaningRecords.reduce((s,r)=>s+r.areas.north+r.areas.east+r.areas.south+r.areas.west,0).toFixed(1);
+            document.getElementById('totalArea').value = projectSettings.totalArea || 0;
+            
+            const total = +projectSettings.totalArea || 0;
+            const done = cleaningRecords.reduce((s,r)=>s + r.cleanArea, 0).toFixed(1);
             const rate = total>0 ? ((done/total)*100).toFixed(1) : 0;
-            const agent = cleaningRecords.reduce((s,r)=>s+r.cleaningAgent,0).toFixed(1);
+            const agent = cleaningRecords.reduce((s,r)=>s + r.cleaningAgent, 0).toFixed(1);
+            
             document.getElementById('current-project').textContent = `項目：${projectSettings.name||'未設定'}`;
             document.getElementById('total-area').textContent = `總面積：${total} m²`;
             document.getElementById('overall-completion').textContent = `完成率：${rate}%`;
             document.getElementById('completedArea').textContent = done+' m²';
             document.getElementById('completionRate').textContent = rate+'%';
             document.getElementById('totalCleaningAgent').textContent = agent;
+            
             const body = document.getElementById('recordsTableBody');
             body.innerHTML = '';
             cleaningRecords.sort((a,b)=>new Date(b.date)-new Date(a.date)).forEach(r=>{
-                const badge = r.status==='completed'?'<span class="status-badge status-completed">完成</span>':r.status==='in-progress'?'<span class="status-badge status-in-progress">進行中</span>':'<span class="status-badge status-pending">待開始</span>';
+                const directionName = { north:'北向', east:'東向', south:'南向', west:'西向' }[r.direction];
                 body.innerHTML += `<tr>
                     <td>${r.date}</td>
-                    <td>${r.areas.north.toFixed(1)}</td>
-                    <td>${r.areas.east.toFixed(1)}</td>
-                    <td>${r.areas.south.toFixed(1)}</td>
-                    <td>${r.areas.west.toFixed(1)}</td>
+                    <td>${directionName}</td>
+                    <td>${r.cleanArea.toFixed(1)}</td>
                     <td>${r.cleaningAgent.toFixed(1)}</td>
                     <td>${r.staff||'-'}</td>
-                    <td>${badge}</td>
+                    <td>${r.remark||'-'}</td>
                     <td><button class="btn btn-danger" onclick="del('${r.date}')">刪</button></td>
                 </tr>`;
             });
