@@ -79,6 +79,11 @@
             border-radius: 5px;
             font-size: 1em;
         }
+        .area-inputs {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
         .direction-area-row {
             display: flex;
             gap: 10px;
@@ -203,7 +208,12 @@
                     </div>
                     <div class="form-group">
                         <label>總面積 (m²)</label>
-                        <input type="number" id="totalArea" placeholder="請輸入專案總面積">
+                        <div class="area-inputs">
+                            <div><label>北向</label><input type="number" id="totalNorth"></div>
+                            <div><label>東向</label><input type="number" id="totalEast"></div>
+                            <div><label>南向</label><input type="number" id="totalSouth"></div>
+                            <div><label>西向</label><input type="number" id="totalWest"></div>
+                        </div>
                     </div>
                     <button class="btn btn-primary" onclick="saveProjectSettings()">儲存設定</button>
                 </div>
@@ -283,7 +293,7 @@
             const name = document.getElementById('newProjectName').value.trim();
             if (!name) return alert('請輸入名稱');
             const id = Date.now().toString();
-            allProjects[id] = { name, settings: { name, totalArea: 0 }, records: [] };
+            allProjects[id] = { name, settings: { name, totalAreas: { north:0,east:0,south:0,west:0 } }, records: [] };
             saveAll();
             document.getElementById('newProjectName').value = '';
             initProjectList();
@@ -321,8 +331,14 @@
 
         function saveProjectSettings() {
             const name = document.getElementById('projectName').value;
-            const totalArea = +document.getElementById('totalArea').value || 0;
-            projectSettings = { name, totalArea };
+            projectSettings = {
+                name, totalAreas: {
+                    north: +document.getElementById('totalNorth').value||0,
+                    east: +document.getElementById('totalEast').value||0,
+                    south: +document.getElementById('totalSouth').value||0,
+                    west: +document.getElementById('totalWest').value||0
+                }
+            };
             saveAll();
             render();
             alert('儲存成功');
@@ -356,9 +372,12 @@
             initProjectList();
             if (!projectSettings) return;
             document.getElementById('projectName').value = projectSettings.name || '';
-            document.getElementById('totalArea').value = projectSettings.totalArea || 0;
+            document.getElementById('totalNorth').value = projectSettings.totalAreas?.north || 0;
+            document.getElementById('totalEast').value = projectSettings.totalAreas?.east || 0;
+            document.getElementById('totalSouth').value = projectSettings.totalAreas?.south || 0;
+            document.getElementById('totalWest').value = projectSettings.totalAreas?.west || 0;
             
-            const total = +projectSettings.totalArea || 0;
+            const total = (+projectSettings.totalAreas.north + +projectSettings.totalAreas.east + +projectSettings.totalAreas.south + +projectSettings.totalAreas.west).toFixed(1);
             const done = cleaningRecords.reduce((s,r)=>s + r.cleanArea, 0).toFixed(1);
             const rate = total>0 ? ((done/total)*100).toFixed(1) : 0;
             const agent = cleaningRecords.reduce((s,r)=>s + r.cleaningAgent, 0).toFixed(1);
