@@ -52,6 +52,9 @@
             border-bottom: 2px solid #f1f1f1;
             padding-bottom: 10px;
             margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         .card-header h2 {
             color: #333;
@@ -78,6 +81,13 @@
             border: 1px solid #ddd;
             border-radius: 5px;
             font-size: 1em;
+        }
+        .filter-input {
+            padding: 6px 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 0.9em;
+            width: 200px;
         }
         .area-row {
             display: grid;
@@ -119,15 +129,23 @@
             border-collapse: collapse;
             min-width: 800px;
         }
-        th, td {
+        th {
+            background-color: #2c6eec;
+            color: white;
+            padding: 10px 12px;
+            text-align: center;
+            white-space: nowrap;
+            cursor: pointer;
+            user-select: none;
+        }
+        th:hover {
+            background-color: #3b8bff;
+        }
+        td {
             padding: 10px 12px;
             text-align: center;
             border-bottom: 1px solid #ddd;
             white-space: nowrap;
-        }
-        th {
-            background-color: #2c6eec;
-            color: white;
         }
         .project-table tr:hover {
             background-color: #f5faff;
@@ -301,27 +319,31 @@
         </div>
     </div>
 
-    <!-- 工程管理 (最頂部) -->
+    <!-- 工程管理 -->
     <div class="card">
-        <div class="card-header"><h2><i class="fas fa-folder-open"></i> 工程管理</h2></div>
+        <div class="card-header">
+            <h2><i class="fas fa-folder-open"></i> 工程管理</h2>
+            <input type="text" class="filter-input" id="projectFilter" placeholder="🔍 搜尋/篩選工程..." oninput="filterProjects()">
+        </div>
         <div style="display:flex; gap:10px; justify-content:flex-start;">
             <button class="btn btn-primary" onclick="openEditProjectModal()">編輯設定</button>
             <button class="btn btn-primary" onclick="openNewProjectModal()">新增工程</button>
             <button class="btn btn-danger" onclick="deleteCurrentProject()">刪除工程</button>
         </div>
-        <div class="table-container" style="margin-top:20px;">
-            <table class="project-table">
+        <div class="table-container">
+            <table class="project-table" id="projectTable">
                 <thead>
                     <tr>
-                        <th>工程名稱</th>
-                        <th>開始日期</th>
-                        <th>完成日期</th>
-                        <th>記錄數</th>
-                        <th>北面</th>
-                        <th>東面</th>
-                        <th>南面</th>
-                        <th>西面</th>
-                        <th>完成度</th>
+                        <th onclick="sortProjects(0)">工程名稱</th>
+                        <th onclick="sortProjects(1)">開始日期</th>
+                        <th onclick="sortProjects(2)">完成日期</th>
+                        <th onclick="sortProjects(3)">記錄數</th>
+                        <th onclick="sortProjects(4)">北面</th>
+                        <th onclick="sortProjects(5)">東面</th>
+                        <th onclick="sortProjects(6)">南面</th>
+                        <th onclick="sortProjects(7)">西面</th>
+                        <th onclick="sortProjects(8)">總面積</th>
+                        <th onclick="sortProjects(9)">完成度</th>
                     </tr>
                 </thead>
                 <tbody id="projectTableBody"></tbody>
@@ -331,7 +353,9 @@
 
     <!-- 進度統計 -->
     <div class="card">
-        <div class="card-header"><h2><i class="fas fa-chart-pie"></i> 進度統計</h2></div>
+        <div class="card-header">
+            <h2><i class="fas fa-chart-pie"></i> 進度統計</h2>
+        </div>
         <div class="summary-stats">
             <div class="stat-card"><div class="stat-label">已完成</div><div class="stat-value" id="completedArea">0</div></div>
             <div class="stat-card"><div class="stat-label">完成率</div><div class="stat-value" id="completionRate">0%</div></div>
@@ -342,16 +366,19 @@
 
     <!-- 記錄列表 -->
     <div class="card">
-        <div class="card-header"><h2><i class="fas fa-list-alt"></i> 記錄列表</h2></div>
+        <div class="card-header">
+            <h2><i class="fas fa-list-alt"></i> 記錄列表</h2>
+            <input type="text" class="filter-input" id="recordFilter" placeholder="🔍 篩選所有欄位..." oninput="filterRecords()">
+        </div>
         <div class="table-container">
-            <table>
+            <table id="recordTable">
                 <thead>
                     <tr>
-                        <th>日期</th>
-                        <th>面向街道</th>
-                        <th>清洗面積</th>
-                        <th>清潔劑</th>
-                        <th>負責人</th>
+                        <th onclick="sortRecords(0)">日期</th>
+                        <th onclick="sortRecords(1)">面向街道</th>
+                        <th onclick="sortRecords(2)">清洗面積</th>
+                        <th onclick="sortRecords(3)">清潔劑</th>
+                        <th onclick="sortRecords(4)">負責人</th>
                         <th>備註</th>
                         <th>操作</th>
                     </tr>
@@ -363,7 +390,9 @@
 
     <!-- 新增記錄 -->
     <div class="card">
-        <div class="card-header"><h2><i class="fas fa-plus-circle"></i> 新增記錄</h2></div>
+        <div class="card-header">
+            <h2><i class="fas fa-plus-circle"></i> 新增記錄</h2>
+        </div>
         <div class="form-group"><label>日期</label><input type="date" id="recordDate"></div>
         <div class="direction-area-row">
             <div class="form-group">
@@ -392,6 +421,8 @@
     let currentProjectId = localStorage.getItem('currentProjectId') || null;
     let cleaningRecords = [], projectSettings = {}, completionChart;
     let isEditMode = false;
+    let projectSortAsc = true, recordSortAsc = true;
+    let lastProjectSortCol = 0, lastRecordSortCol = 0;
 
     window.onload = function() {
         init();
@@ -458,7 +489,7 @@
         document.getElementById('projectModal').style.display = 'none';
     }
 
-    // 儲存工程（包含街道名）
+    // 儲存工程
     function saveProjectFromModal() {
         const name = document.getElementById('modalProjectName').value.trim();
         if (!name) { alert('請輸入項目名稱'); return; }
@@ -535,8 +566,48 @@
         render();
     }
 
-    // 工程一覽表
-    function renderProjectTable() {
+    // 工程列表排序
+    function sortProjects(col) {
+        if (lastProjectSortCol === col) projectSortAsc = !projectSortAsc;
+        else { projectSortAsc = true; lastProjectSortCol = col; }
+        
+        let projectList = Object.entries(allProjects).map(([id, data]) => ({ id, ...data }));
+        
+        projectList.sort((a, b) => {
+            let valA, valB;
+            switch(col) {
+                case 0: valA=a.name; valB=b.name; break;
+                case 1: valA=a.settings.startDate; valB=b.settings.startDate; break;
+                case 2: valA=a.settings.endDate; valB=b.settings.endDate; break;
+                case 3: valA=a.records.length; valB=b.records.length; break;
+                case 4: valA=a.settings.totalAreas.north; valB=b.settings.totalAreas.north; break;
+                case 5: valA=a.settings.totalAreas.east; valB=b.settings.totalAreas.east; break;
+                case 6: valA=a.settings.totalAreas.south; valB=b.settings.totalAreas.south; break;
+                case 7: valA=a.settings.totalAreas.west; valB=b.settings.totalAreas.west; break;
+                case 8: valA=Object.values(a.settings.totalAreas).reduce((t,n)=>t+n,0); valB=Object.values(b.settings.totalAreas).reduce((t,n)=>t+n,0); break;
+                case 9: valA=(a.records.reduce((s,r)=>s+r.cleanArea,0)/Object.values(a.settings.totalAreas).reduce((t,n)=>t+n,0))*100||0;
+                        valB=(b.records.reduce((s,r)=>s+r.cleanArea,0)/Object.values(b.settings.totalAreas).reduce((t,n)=>t+n,0))*100||0; break;
+                default: return 0;
+            }
+            if (valA < valB) return projectSortAsc ? -1 : 1;
+            if (valA > valB) return projectSortAsc ? 1 : -1;
+            return 0;
+        });
+        
+        const temp = {};
+        projectList.forEach(p => temp[p.id] = p);
+        allProjects = temp;
+        renderProjectTable();
+    }
+
+    // 工程篩選
+    function filterProjects() {
+        const f = document.getElementById('projectFilter').value.toLowerCase();
+        renderProjectTable(f);
+    }
+
+    // 工程列表渲染
+    function renderProjectTable(filter = '') {
         const tbody = document.getElementById('projectTableBody');
         tbody.innerHTML = '';
 
@@ -550,6 +621,9 @@
             const doneArea = pj.records.reduce((sum, r) => sum + r.cleanArea, 0);
             const rate = totalArea > 0 ? ((doneArea / totalArea)*100).toFixed(1) + '%' : '0%';
 
+            const rowText = `${pj.name} ${s.startDate} ${s.endDate} ${totalArea} ${rate}`.toLowerCase();
+            if (filter && !rowText.includes(filter)) return;
+
             tbody.innerHTML += `
             <tr class="${id === currentProjectId ? 'active' : ''}" onclick="switchProjectId('${id}')">
                 <td>${pj.name}</td>
@@ -560,7 +634,71 @@
                 <td>${totalEast}</td>
                 <td>${totalSouth}</td>
                 <td>${totalWest}</td>
+                <td>${totalArea}</td>
                 <td>${rate}</td>
+            </tr>`;
+        });
+    }
+
+    // 記錄排序
+    function sortRecords(col) {
+        if (lastRecordSortCol === col) recordSortAsc = !recordSortAsc;
+        else { recordSortAsc = true; lastRecordSortCol = col; }
+        
+        cleaningRecords.sort((a, b) => {
+            let valA, valB;
+            switch(col) {
+                case 0: valA=a.date; valB=b.date; break;
+                case 1:
+                    valA = a.direction === 'north' ? projectSettings.streetNorth||'北面' :
+                          a.direction === 'east' ? projectSettings.streetEast||'東面' :
+                          a.direction === 'south' ? projectSettings.streetSouth||'南面' : projectSettings.streetWest||'西面';
+                    valB = b.direction === 'north' ? projectSettings.streetNorth||'北面' :
+                          b.direction === 'east' ? projectSettings.streetEast||'東面' :
+                          b.direction === 'south' ? projectSettings.streetSouth||'南面' : projectSettings.streetWest||'西面';
+                    break;
+                case 2: valA=a.cleanArea; valB=b.cleanArea; break;
+                case 3: valA=a.cleaningAgent; valB=b.cleaningAgent; break;
+                case 4: valA=a.staff||''; valB=b.staff||''; break;
+                default: return 0;
+            }
+            if (valA < valB) return recordSortAsc ? -1 : 1;
+            if (valA > valB) return recordSortAsc ? 1 : -1;
+            return 0;
+        });
+        if(currentProjectId) allProjects[currentProjectId].records = cleaningRecords;
+        localStorage.setItem('allProjects', JSON.stringify(allProjects));
+        filterRecords();
+    }
+
+    // 記錄篩選
+    function filterRecords() {
+        const f = document.getElementById('recordFilter').value.toLowerCase();
+        const body = document.getElementById('recordsTableBody');
+        body.innerHTML = '';
+        
+        if (!projectSettings) return;
+        
+        cleaningRecords.sort((a,b)=>new Date(b.date)-new Date(a.date));
+        
+        cleaningRecords.forEach(r => {
+            let streetName = '';
+            if (r.direction === 'north') streetName = projectSettings.streetNorth || '北面';
+            if (r.direction === 'east')  streetName = projectSettings.streetEast  || '東面';
+            if (r.direction === 'south') streetName = projectSettings.streetSouth || '南面';
+            if (r.direction === 'west')  streetName = projectSettings.streetWest  || '西面';
+            
+            const rowText = `${r.date} ${streetName} ${r.cleanArea} ${r.cleaningAgent} ${r.staff||''} ${r.remark||''}`.toLowerCase();
+            if (f && !rowText.includes(f)) return;
+            
+            body.innerHTML += `<tr>
+                <td>${r.date}</td>
+                <td>${streetName}</td>
+                <td>${r.cleanArea.toFixed(1)}</td>
+                <td>${r.cleaningAgent.toFixed(1)}</td>
+                <td>${r.staff||'-'}</td>
+                <td><button class="btn btn-primary btn-sm" onclick="showRemarkModal(\`${r.remark||''}\`)">查看</button></td>
+                <td><button class="btn btn-danger btn-sm" onclick="del('${r.date}')">刪</button></td>
             </tr>`;
         });
     }
@@ -613,10 +751,9 @@
 
     // 主渲染
     function render() {
-        renderProjectTable();
+        renderProjectTable(document.getElementById('projectFilter')?.value.toLowerCase() || '');
         if (!projectSettings) return;
         
-        // 更新下拉選單顯示街道名
         const sel = document.getElementById('direction');
         sel.innerHTML = `
             <option value="north">${projectSettings.streetNorth || '北面'}</option>
@@ -644,27 +781,7 @@
         document.getElementById('completionRate').textContent = rate+'%';
         document.getElementById('totalCleaningAgent').textContent = agent;
         
-        const body = document.getElementById('recordsTableBody');
-        body.innerHTML = '';
-        cleaningRecords.sort((a, b) => new Date(b.date) - new Date(a.date)).forEach(r => {
-            let streetName = '';
-            if (r.direction === 'north') streetName = projectSettings.streetNorth || '北面';
-            if (r.direction === 'east')  streetName = projectSettings.streetEast  || '東面';
-            if (r.direction === 'south') streetName = projectSettings.streetSouth || '南面';
-            if (r.direction === 'west')  streetName = projectSettings.streetWest  || '西面';
-            
-            body.innerHTML += `<tr>
-                <td>${r.date}</td>
-                <td>${streetName}</td>
-                <td>${r.cleanArea.toFixed(1)}</td>
-                <td>${r.cleaningAgent.toFixed(1)}</td>
-                <td>${r.staff||'-'}</td>
-                <td>
-                    <button class="btn btn-primary btn-sm" onclick="showRemarkModal(\`${r.remark||''}\`)">查看</button>
-                </td>
-                <td><button class="btn btn-danger btn-sm" onclick="del('${r.date}')">刪</button></td>
-            </tr>`;
-        });
+        filterRecords();
         initChart(total, done);
     }
 
