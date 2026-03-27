@@ -222,6 +222,19 @@
             <label>項目名稱</label>
             <input type="text" id="modalProjectName">
         </div>
+
+        <!-- 🔥 新增：開始日期 & 完成日期 -->
+        <div class="direction-area-row">
+            <div class="form-group">
+                <label>開始日期</label>
+                <input type="date" id="modalStartDate">
+            </div>
+            <div class="form-group">
+                <label>預計完成日期</label>
+                <input type="date" id="modalEndDate">
+            </div>
+        </div>
+
         <div class="form-group">
             <label>總面積 (m²)</label>
             <div class="area-inputs">
@@ -243,7 +256,9 @@
         <div class="project-info">
             <span id="current-project">項目：未設定</span>｜
             <span id="total-area">總面積：0 m²</span>｜
-            <span id="overall-completion">完成率：0%</span>
+            <span id="overall-completion">完成率：0%</span><br>
+            <!-- 🔥 頂部顯示開始/完成日期 -->
+            <span id="project-date-info" style="margin-top:5px;display:inline-block;"></span>
         </div>
         
         <div class="sync-buttons">
@@ -344,6 +359,8 @@
     function openNewProjectModal() {
         isEditMode = false;
         document.getElementById('modalProjectName').value = '';
+        document.getElementById('modalStartDate').value = '';
+        document.getElementById('modalEndDate').value = '';
         document.getElementById('modalTotalNorth').value = 0;
         document.getElementById('modalTotalEast').value = 0;
         document.getElementById('modalTotalSouth').value = 0;
@@ -356,6 +373,8 @@
         isEditMode = true;
         const pj = allProjects[currentProjectId];
         document.getElementById('modalProjectName').value = pj.settings.name;
+        document.getElementById('modalStartDate').value = pj.settings.startDate || '';
+        document.getElementById('modalEndDate').value = pj.settings.endDate || '';
         document.getElementById('modalTotalNorth').value = pj.settings.totalAreas.north;
         document.getElementById('modalTotalEast').value = pj.settings.totalAreas.east;
         document.getElementById('modalTotalSouth').value = pj.settings.totalAreas.south;
@@ -367,10 +386,14 @@
         document.getElementById('projectModal').style.display = 'none';
     }
 
-    // 儲存專案設定（已修復，不會刪除記錄）
+    // 儲存專案設定（已包含開始/完成日期）
     function saveProjectFromModal() {
         const name = document.getElementById('modalProjectName').value.trim();
         if (!name) { alert('請輸入項目名稱'); return; }
+        
+        const startDate = document.getElementById('modalStartDate').value;
+        const endDate = document.getElementById('modalEndDate').value;
+
         const totalAreas = {
             north: Number(document.getElementById('modalTotalNorth').value) || 0,
             east: Number(document.getElementById('modalTotalEast').value) || 0,
@@ -379,8 +402,10 @@
         };
 
         if (isEditMode) {
-            // 編輯：只更新設定，保留記錄
+            // 編輯：更新所有設定
             allProjects[currentProjectId].settings.name = name;
+            allProjects[currentProjectId].settings.startDate = startDate;
+            allProjects[currentProjectId].settings.endDate = endDate;
             allProjects[currentProjectId].settings.totalAreas = totalAreas;
             localStorage.setItem('allProjects', JSON.stringify(allProjects));
             loadProject(currentProjectId);
@@ -389,7 +414,7 @@
             const id = Date.now().toString();
             allProjects[id] = { 
                 name, 
-                settings: { name, totalAreas }, 
+                settings: { name, startDate, endDate, totalAreas }, 
                 records: [] 
             };
             localStorage.setItem('allProjects', JSON.stringify(allProjects));
@@ -417,7 +442,7 @@
         if (!id || !allProjects[id]) return;
         const pj = allProjects[id];
         projectSettings = pj.settings;
-        cleaningRecords = pj.records; // 讀取該工程的記錄
+        cleaningRecords = pj.records;
         render();
     }
 
@@ -440,9 +465,7 @@
         });
     }
 
-    // ==============================
-    // ✅ 已修復：新增記錄真正存入工程
-    // ==============================
+    // 新增記錄
     function addCleaningRecord() {
         if (!currentProjectId || !allProjects[currentProjectId]) {
             alert("請先選擇一個工程！");
@@ -465,18 +488,13 @@
             remark: document.getElementById('remark').value
         };
 
-        // 🔥 關鍵修復：先移除同日期舊記錄
         let project = allProjects[currentProjectId];
         project.records = project.records.filter(x => x.date !== date);
         project.records.push(newRecord);
-
-        // 🔥 關鍵修復：同步更新全域變數
         cleaningRecords = project.records;
 
-        // 儲存到本機
         localStorage.setItem('allProjects', JSON.stringify(allProjects));
 
-        // 清空表單
         document.getElementById('cleanArea').value = '';
         document.getElementById('cleaningAgent').value = '';
         document.getElementById('cleaningStaff').value = '';
@@ -485,9 +503,7 @@
         render();
     }
 
-    // ==============================
-    // ✅ 已修復：刪除記錄也同步存檔
-    // ==============================
+    // 刪除記錄
     function del(date) {
         if (!currentProjectId) return;
         let project = allProjects[currentProjectId];
@@ -509,6 +525,13 @@
         document.getElementById('current-project').textContent = `項目：${projectSettings.name||'未設定'}`;
         document.getElementById('total-area').textContent = `總面積：${total} m²`;
         document.getElementById('overall-completion').textContent = `完成率：${rate}%`;
+        
+        // 🔥 顯示開始/完成日期
+        let dateText = '';
+        if(projectSettings.startDate) dateText += `開始：${projectSettings.startDate}　`;
+        if(projectSettings.endDate) dateText += `預計完成：${projectSettings.endDate}`;
+        document.getElementById('project-date-info').innerText = dateText;
+
         document.getElementById('completedArea').textContent = done+' m²';
         document.getElementById('completionRate').textContent = rate+'%';
         document.getElementById('totalCleaningAgent').textContent = agent;
