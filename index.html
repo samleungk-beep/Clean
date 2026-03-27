@@ -92,7 +92,7 @@
             flex: 1;
         }
         .btn {
-            padding: 10px 20px;
+            padding: 6px 12px;
             border: none;
             border-radius: 5px;
             cursor: pointer;
@@ -105,6 +105,10 @@
         .btn-danger {
             background-color: #ff4444;
             color: white;
+        }
+        .btn-sm {
+            padding: 4px 8px;
+            font-size: 0.9em;
         }
         .table-container {
             overflow-x: auto;
@@ -206,6 +210,12 @@
             gap: 10px;
             margin-top: 20px;
         }
+        /* 備註彈窗 */
+        .remark-modal .modal-content {
+            max-width: 500px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -250,6 +260,20 @@
     </div>
 </div>
 
+<!-- 備註查看彈窗 -->
+<div class="modal-overlay remark-modal" id="remarkModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>備註內容</h3>
+            <button class="modal-close" onclick="closeRemarkModal()">&times;</button>
+        </div>
+        <div id="remarkContent" style="padding:10px; min-height:100px; white-space:pre-wrap;"></div>
+        <div class="modal-footer">
+            <button class="btn btn-primary" onclick="closeRemarkModal()">關閉</button>
+        </div>
+    </div>
+</div>
+
 <div id="mainContent">
     <div class="header">
         <h1><i class="fas fa-building"></i> 清潔進度記錄表</h1>
@@ -269,15 +293,13 @@
 
     <div class="card">
         <div class="card-header"><h2><i class="fas fa-folder-open"></i> 工程管理</h2></div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
-            <input type="text" id="newProjectName" placeholder="新工程名稱" style="flex:1;min-width:200px;">
+        
+        <div style="display:flex; gap:10px; justify-content:flex-start;">
+            <button class="btn btn-primary" onclick="openEditProjectModal()">編輯設定</button>
             <button class="btn btn-primary" onclick="openNewProjectModal()">新增工程</button>
-            <select id="currentProjectSelect" onchange="switchProject()" style="flex:1;min-width:200px;"></select>
             <button class="btn btn-danger" onclick="deleteCurrentProject()">刪除工程</button>
-            <button class="btn btn-primary" onclick="openEditProjectModal()" style="margin-left:auto;">編輯設定</button>
         </div>
 
-        <!-- 🔥 新增：工程一覽表 -->
         <div class="table-container" style="margin-top:20px;">
             <table class="project-table">
                 <thead>
@@ -344,7 +366,7 @@
                     <table><thead><tr>
                         <th>日期</th>
                         <th>面向街道</th>
-                        <th>清洗面積 (m²)</th>
+                        <th>清洗面積</th>
                         <th>清潔劑</th>
                         <th>負責人</th>
                         <th>備註</th>
@@ -371,7 +393,16 @@
         if (currentProjectId) loadProject(currentProjectId);
     }
 
-    // 彈窗
+    // 備註彈窗
+    function showRemarkModal(text) {
+        document.getElementById('remarkContent').innerText = text || '無備註';
+        document.getElementById('remarkModal').style.display = 'flex';
+    }
+    function closeRemarkModal() {
+        document.getElementById('remarkModal').style.display = 'none';
+    }
+
+    // 工程彈窗
     function openNewProjectModal() {
         isEditMode = false;
         document.getElementById('modalProjectName').value = '';
@@ -441,10 +472,6 @@
     }
 
     // 切換工程
-    function switchProject() {
-        switchProjectId(document.getElementById('currentProjectSelect').value);
-    }
-
     function switchProjectId(id) {
         currentProjectId = id;
         localStorage.setItem('currentProjectId', id);
@@ -462,13 +489,14 @@
     // 刪除工程
     function deleteCurrentProject() {
         if (!currentProjectId) return;
+        if(!confirm('確定要刪除此工程嗎？所有記錄將一併刪除！')) return;
         delete allProjects[currentProjectId];
         currentProjectId = null;
         localStorage.setItem('allProjects', JSON.stringify(allProjects));
         render();
     }
 
-    // 🔥 新增：渲染工程一覽表
+    // 工程一覽表
     function renderProjectTable() {
         const tbody = document.getElementById('projectTableBody');
         tbody.innerHTML = '';
@@ -498,19 +526,10 @@
         });
     }
 
-    // 初始化下拉與列表
-    function initProjectListAndSelect() {
-        const sel = document.getElementById('currentProjectSelect');
-        sel.innerHTML = '<option value="">請選擇工程</option>';
-        Object.entries(allProjects).forEach(([id, p]) => {
-            sel.innerHTML += `<option value="${id}" ${id == currentProjectId ? 'selected' : ''}>${p.name}</option>`;
-        });
-    }
-
     // 新增記錄
     function addCleaningRecord() {
         if (!currentProjectId || !allProjects[currentProjectId]) {
-            alert("請先選擇一個工程！");
+            alert("請先點選表格中的工程！");
             return;
         }
 
@@ -555,8 +574,7 @@
 
     // 主渲染
     function render() {
-        initProjectListAndSelect();
-        renderProjectTable(); // 🔥 工程表一併更新
+        renderProjectTable();
         if (!projectSettings) return;
         
         const total = (+projectSettings.totalAreas.north + +projectSettings.totalAreas.east +
@@ -588,8 +606,10 @@
                 <td>${r.cleanArea.toFixed(1)}</td>
                 <td>${r.cleaningAgent.toFixed(1)}</td>
                 <td>${r.staff||'-'}</td>
-                <td>${r.remark||'-'}</td>
-                <td><button class="btn btn-danger" onclick="del('${r.date}')">刪</button></td>
+                <td>
+                    <button class="btn btn-primary btn-sm" onclick="showRemarkModal(\`${r.remark||''}\`)">查看</button>
+                </td>
+                <td><button class="btn btn-danger btn-sm" onclick="del('${r.date}')">刪</button></td>
             </tr>`;
         });
         initChart(total, done);
