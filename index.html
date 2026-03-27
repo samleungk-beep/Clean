@@ -141,6 +141,10 @@
             background-color: #ff4444;
             color: white;
         }
+        .btn-success {
+            background-color: #28a745;
+            color: white;
+        }
         .btn-sm {
             padding: 4px 8px;
             font-size: 0.9em;
@@ -257,6 +261,54 @@
             object-fit: contain;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
+
+        /* 示意圖表樣式 */
+        .grid-canvas {
+            margin: 15px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            align-items: center;
+        }
+        .grid-row {
+            display: flex;
+            gap: 4px;
+        }
+        .grid-cell {
+            width: 36px;
+            height: 36px;
+            border: 2px solid #333;
+            background: white;
+        }
+        .grid-cell.filled {
+            background: #28a745;
+            border-color: #19692c;
+        }
+        #chartPreview {
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 6px;
+            min-height: 120px;
+        }
+        #previewGrid {
+            margin-top: 10px;
+        }
+        .range-inputs {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 6px;
+        }
+        .range-inputs input {
+            width: 70px;
+            text-align: center;
+        }
+        .saved-chart {
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px dashed #ccc;
+            border-radius: 6px;
+        }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -322,14 +374,15 @@
     </div>
 </div>
 
-<!-- 備註彈窗 -->
+<!-- 備註彈窗（含圖表+圖片） -->
 <div class="modal-overlay remark-modal" id="remarkModal">
     <div class="modal-content">
         <div class="modal-header">
-            <h3>備註 & 示例圖</h3>
+            <h3>備註 & 示意圖 & 圖片</h3>
             <button class="modal-close" onclick="closeRemarkModal()">&times;</button>
         </div>
         <div id="remarkContent" style="padding:10px; min-height:60px; white-space:pre-wrap;"></div>
+        <div id="remarkChart" style="padding:10px; min-height:80px;"></div>
         <img id="remarkImage" class="remark-image" style="display:none;">
         <div class="modal-footer">
             <button class="btn btn-primary" onclick="closeRemarkModal()">關閉</button>
@@ -347,6 +400,47 @@
         <div id="worktimeContent" style="padding:10px; min-height:100px; white-space:pre-wrap;"></div>
         <div class="modal-footer">
             <button class="btn btn-primary" onclick="closeWorktimeModal()">關閉</button>
+        </div>
+    </div>
+</div>
+
+<!-- 示意圖表彈窗 -->
+<div class="modal-overlay" id="chartModal">
+    <div class="modal-content" style="max-width:700px;">
+        <div class="modal-header">
+            <h2><i class="fas fa-th"></i> 加入示意圖表</h2>
+            <button class="modal-close" onclick="closeChartModal()">&times;</button>
+        </div>
+        
+        <div class="direction-area-row">
+            <div class="form-group">
+                <label>玻璃行數（A）</label>
+                <input type="number" id="gridCols" min="1" value="6" oninput="renderGrid()">
+            </div>
+            <div class="form-group">
+                <label>層數（B）</label>
+                <input type="number" id="gridRows" min="1" value="1" oninput="renderGrid()">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>清洗範圍（由第 ? 行至第 ? 行）</label>
+            <div class="range-inputs">
+                <span>由</span>
+                <input type="number" id="rangeStart" min="1" value="1" oninput="renderGrid()">
+                <span>至</span>
+                <input type="number" id="rangeEnd" min="1" value="6" oninput="renderGrid()">
+            </div>
+        </div>
+
+        <div id="chartPreview">
+            <label>預覽圖表</label>
+            <div id="previewGrid" class="grid-canvas"></div>
+        </div>
+
+        <div class="modal-footer">
+            <button class="btn btn-danger" onclick="closeChartModal()">取消</button>
+            <button class="btn btn-success" onclick="saveGridChart()">確定</button>
         </div>
     </div>
 </div>
@@ -549,8 +643,13 @@
             </div>
         </div>
 
-        <!-- 示例圖 -->
+        <!-- 示意圖表 + 示例圖 -->
         <div class="form-group">
+            <button class="btn btn-success" onclick="openChartModal()" style="margin-bottom:10px;">
+                <i class="fas fa-th"></i> 加入示意圖表
+            </button>
+            <div id="savedGridChart" class="saved-chart" style="display:none;"></div>
+            
             <label>示例圖</label>
             <input type="file" id="exampleImage" accept="image/*">
         </div>
@@ -567,6 +666,7 @@
     let isEditMode = false;
     let projectSortAsc = true, recordSortAsc = true;
     let lastProjectSortCol = 0, lastRecordSortCol = 0;
+    let currentGridData = null;
 
     window.onload = function() {
         init();
@@ -577,11 +677,39 @@
         if (currentProjectId) loadProject(currentProjectId);
     }
 
-    // 備註彈窗（含圖片）
-    function showRemarkModal(text, imageBase64) {
+    // 備註彈窗（文字 + 圖表 + 圖片）
+    function showRemarkModal(text, chartData, imageBase64) {
+        text = decodeURIComponent(text || '');
+        imageBase64 = decodeURIComponent(imageBase64 || '');
+        
         document.getElementById('remarkContent').innerText = text || '無備註';
+        
+        const chartBox = document.getElementById('remarkChart');
+        chartBox.innerHTML = '';
+        if (chartData) {
+            try { chartData = JSON.parse(decodeURIComponent(chartData)); } catch (e) {}
+            if (chartData) {
+                const div = document.createElement('div');
+                div.className = 'grid-canvas';
+                for (let r = 0; r < chartData.rows; r++) {
+                    const row = document.createElement('div');
+                    row.className = 'grid-row';
+                    for (let c = 0; c < chartData.cols; c++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'grid-cell';
+                        if (c+1 >= chartData.start && c+1 <= chartData.end) {
+                            cell.classList.add('filled');
+                        }
+                        row.appendChild(cell);
+                    }
+                    div.appendChild(row);
+                }
+                chartBox.appendChild(div);
+            }
+        }
+
         const img = document.getElementById('remarkImage');
-        if (imageBase64) {
+        if (imageBase64 && imageBase64.startsWith('data:image')) {
             img.src = imageBase64;
             img.style.display = 'block';
         } else {
@@ -602,7 +730,69 @@
         document.getElementById('worktimeModal').style.display = 'none';
     }
 
-    // 新增運作時間組 (含分鐘)
+    // 示意圖表彈窗
+    function openChartModal() {
+        document.getElementById('chartModal').style.display = 'flex';
+        renderGrid();
+    }
+    function closeChartModal() {
+        document.getElementById('chartModal').style.display = 'none';
+    }
+
+    // 渲染方格圖表
+    function renderGrid() {
+        const cols = parseInt(document.getElementById('gridCols').value) || 6;
+        const rows = parseInt(document.getElementById('gridRows').value) || 1;
+        const start = parseInt(document.getElementById('rangeStart').value) || 1;
+        const end = parseInt(document.getElementById('rangeEnd').value) || cols;
+
+        const container = document.getElementById('previewGrid');
+        container.innerHTML = '';
+
+        for (let r = 0; r < rows; r++) {
+            const rowDiv = document.createElement('div');
+            rowDiv.className = 'grid-row';
+            for (let c = 0; c < cols; c++) {
+                const cell = document.createElement('div');
+                cell.className = 'grid-cell';
+                if (c+1 >= start && c+1 <= end) {
+                    cell.classList.add('filled');
+                }
+                rowDiv.appendChild(cell);
+            }
+            container.appendChild(rowDiv);
+        }
+
+        currentGridData = { cols, rows, start, end };
+    }
+
+    // 儲存圖表到介面
+    function saveGridChart() {
+        if (!currentGridData) return;
+        const target = document.getElementById('savedGridChart');
+        target.style.display = 'block';
+        target.innerHTML = `<label>示意圖表：</label>`;
+        
+        const canvas = document.createElement('div');
+        canvas.className = 'grid-canvas';
+        for (let r = 0; r < currentGridData.rows; r++) {
+            const row = document.createElement('div');
+            row.className = 'grid-row';
+            for (let c = 0; c < currentGridData.cols; c++) {
+                const cell = document.createElement('div');
+                cell.className = 'grid-cell';
+                if (c+1 >= currentGridData.start && c+1 <= currentGridData.end) {
+                    cell.classList.add('filled');
+                }
+                row.appendChild(cell);
+            }
+            canvas.appendChild(row);
+        }
+        target.appendChild(canvas);
+        closeChartModal();
+    }
+
+    // 新增運作時間組
     function addTimePair() {
         const container = document.getElementById('timePairsContainer');
         const div = document.createElement('div');
@@ -652,7 +842,7 @@
         btn.parentElement.remove();
     }
 
-    // 收集所有運作時間 (含分鐘)
+    // 收集所有運作時間
     function collectWorkTime() {
         const pairs = document.querySelectorAll('.time-pair-row');
         const list = [];
@@ -928,12 +1118,16 @@
             const rowText = `${r.date} ${streetName} ${r.timeSlot||""} ${r.cleanScope||""} ${r.lineCount||""} ${r.cleanArea} ${r.waterUsage||""} ${r.cleaningAgent} ${r.operator||""} ${r.staff||""} ${r.remark||""}`.toLowerCase();
             if (f && !rowText.includes(f)) return;
             
+            const gridStr = r.gridData ? encodeURIComponent(JSON.stringify(r.gridData)) : '';
+            const remarkStr = encodeURIComponent(r.remark || '');
+            const imageStr = encodeURIComponent(r.image || '');
+
             body.innerHTML += `<tr>
                 <td>${r.date}</td>
                 <td>${streetName}</td>
                 <td>
                     ${r.timeSlot || '-'}
-                    <button class="btn btn-sm btn-primary" onclick="showWorktimeModal(\`${r.workTime||''}\`)" style="margin-left:4px;">
+                    <button class="btn btn-sm btn-primary" onclick="showWorktimeModal('${r.workTime||''}')" style="margin-left:4px;">
                         <i class="fas fa-clock"></i>
                     </button>
                 </td>
@@ -944,7 +1138,7 @@
                 <td>${r.cleaningAgent.toFixed(1)}</td>
                 <td>${r.operator || '-'}</td>
                 <td>${r.staff || '-'}</td>
-                <td><button class="btn btn-primary btn-sm" onclick="showRemarkModal(\`${r.remark||''}\`, \`${r.image||''}\`)">查看</button></td>
+                <td><button class="btn btn-primary btn-sm" onclick="showRemarkModal('${remarkStr}', '${gridStr}', '${imageStr}')">查看</button></td>
                 <td><button class="btn btn-danger btn-sm" onclick="del(${index})">刪</button></td>
             </tr>`;
         });
@@ -961,7 +1155,7 @@
         });
     }
 
-    // 新增記錄（含圖片 & 操作員）
+    // 新增記錄（含圖表）
     async function addCleaningRecord() {
         if (!currentProjectId || !allProjects[currentProjectId]) {
             alert("請先點選表格中的工程！");
@@ -987,7 +1181,8 @@
             cleaningAgent: +document.getElementById('cleaningAgent').value || 0,
             staff: document.getElementById('cleaningStaff').value,
             remark: document.getElementById('remark').value,
-            cleanScope, lineCount, waterUsage, operator, image
+            cleanScope, lineCount, waterUsage, operator, image,
+            gridData: currentGridData
         };
 
         let project = allProjects[currentProjectId];
@@ -1006,6 +1201,9 @@
         document.getElementById('cleaningStaff').value = '';
         document.getElementById('remark').value = '';
         document.getElementById('exampleImage').value = '';
+        document.getElementById('savedGridChart').innerHTML = '';
+        document.getElementById('savedGridChart').style.display = 'none';
+        currentGridData = null;
 
         render();
         alert('新增記錄成功！');
