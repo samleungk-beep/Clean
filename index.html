@@ -152,7 +152,7 @@
         table {
             width: 100%;
             border-collapse: collapse;
-            min-width: 950px;
+            min-width: 1100px;
         }
         th {
             background-color: #2c6eec;
@@ -417,8 +417,11 @@
                         <th onclick="sortRecords(0)">日期</th>
                         <th onclick="sortRecords(1)">面向街道</th>
                         <th onclick="sortRecords(2)">時間</th>
+                        <th onclick="sortRecords(6)">清洗範圍</th>
+                        <th onclick="sortRecords(7)">行數</th>
                         <th onclick="sortRecords(3)">清洗面積</th>
-                        <th onclick="sortRecords(4)">清潔劑</th>
+                        <th onclick="sortRecords(8)">用水量(ml)</th>
+                        <th onclick="sortRecords(4)">清潔劑(ml)</th>
                         <th onclick="sortRecords(5)">負責人</th>
                         <th>備註</th>
                         <th>操作</th>
@@ -496,8 +499,34 @@
             <button type="button" class="btn btn-sm btn-primary" onclick="addTimePair()" style="margin-top:6px;">+ 新增時間段</button>
         </div>
 
-        <div class="form-group"><label>清洗面積 (m²)</label><input type="number" id="cleanArea" placeholder="可留空或輸入0"></div>
-        <div class="form-group"><label>清潔劑</label><input type="number" id="cleaningAgent"></div>
+        <!-- 清洗範圍、行數、清洗面積 同一行 -->
+        <div class="direction-area-row">
+            <div class="form-group">
+                <label>清洗範圍</label>
+                <input type="text" id="cleanScope" placeholder="例如：人行道、車道、廣場">
+            </div>
+            <div class="form-group">
+                <label>行數</label>
+                <input type="number" id="lineCount" placeholder="輸入行數">
+            </div>
+            <div class="form-group">
+                <label>清洗面積 (m²)</label>
+                <input type="number" id="cleanArea" placeholder="可留空或輸入0">
+            </div>
+        </div>
+
+        <!-- 用水量、清潔劑 同一行 -->
+        <div class="direction-area-row">
+            <div class="form-group">
+                <label>用水量 (ml)</label>
+                <input type="number" id="waterUsage">
+            </div>
+            <div class="form-group">
+                <label>清潔劑 (ml)</label>
+                <input type="number" id="cleaningAgent">
+            </div>
+        </div>
+
         <div class="form-group"><label>負責人</label><input type="text" id="cleaningStaff"></div>
         <div class="form-group"><label>備註</label><textarea id="remark" rows="3"></textarea></div>
         <button class="btn btn-primary" onclick="addCleaningRecord()">新增記錄</button>
@@ -829,6 +858,9 @@
                 case 3: valA = parseFloat(a.cleanArea) || 0; valB = parseFloat(b.cleanArea) || 0; break;
                 case 4: valA = parseFloat(a.cleaningAgent) || 0; valB = parseFloat(b.cleaningAgent) || 0; break;
                 case 5: valA = (a.staff || "").toLowerCase(); valB = (b.staff || "").toLowerCase(); break;
+                case 6: valA = (a.cleanScope || "").toLowerCase(); valB = (b.cleanScope || "").toLowerCase(); break;
+                case 7: valA = parseFloat(a.lineCount) || 0; valB = parseFloat(b.lineCount) || 0; break;
+                case 8: valA = parseFloat(a.waterUsage) || 0; valB = parseFloat(b.waterUsage) || 0; break;
                 default: return 0;
             }
             if (valA < valB) return recordSortAsc ? -1 : 1;
@@ -843,7 +875,7 @@
         filterRecords();
     }
 
-    // 修復：記錄篩選功能
+    // 記錄篩選功能
     function filterRecords() {
         const f = document.getElementById('recordFilter').value.toLowerCase();
         const body = document.getElementById('recordsTableBody');
@@ -858,7 +890,7 @@
             if (r.direction === 'south') streetName = projectSettings.streetSouth || '南面';
             if (r.direction === 'west')  streetName = projectSettings.streetWest  || '西面';
             
-            const rowText = `${r.date} ${streetName} ${r.timeSlot||""} ${r.cleanArea} ${r.cleaningAgent} ${r.staff||""} ${r.remark||""}`.toLowerCase();
+            const rowText = `${r.date} ${streetName} ${r.timeSlot||""} ${r.cleanScope||""} ${r.lineCount||""} ${r.cleanArea} ${r.waterUsage||""} ${r.cleaningAgent} ${r.staff||""} ${r.remark||""}`.toLowerCase();
             if (f && !rowText.includes(f)) return;
             
             body.innerHTML += `<tr>
@@ -870,7 +902,10 @@
                         <i class="fas fa-clock"></i>
                     </button>
                 </td>
+                <td>${r.cleanScope || '-'}</td>
+                <td>${r.lineCount || '-'}</td>
                 <td>${r.cleanArea.toFixed(1)}</td>
+                <td>${r.waterUsage ? r.waterUsage.toFixed(1) : '-'}</td>
                 <td>${r.cleaningAgent.toFixed(1)}</td>
                 <td>${r.staff||'-'}</td>
                 <td><button class="btn btn-primary btn-sm" onclick="showRemarkModal(\`${r.remark||''}\`)">查看</button></td>
@@ -893,12 +928,18 @@
         const timeSlot = document.getElementById('timeSlot').value;
         const cleanArea = +document.getElementById('cleanArea').value || 0;
         const workTime = collectWorkTime();
+        
+        // 新增三個字段
+        const cleanScope = document.getElementById('cleanScope').value.trim();
+        const lineCount = +document.getElementById('lineCount').value || 0;
+        const waterUsage = +document.getElementById('waterUsage').value || 0;
 
         const newRecord = {
             date, direction, timeSlot, cleanArea, workTime,
             cleaningAgent: +document.getElementById('cleaningAgent').value || 0,
             staff: document.getElementById('cleaningStaff').value,
-            remark: document.getElementById('remark').value
+            remark: document.getElementById('remark').value,
+            cleanScope, lineCount, waterUsage
         };
 
         let project = allProjects[currentProjectId];
@@ -907,7 +948,11 @@
 
         localStorage.setItem('allProjects', JSON.stringify(allProjects));
 
+        // 清空輸入框
+        document.getElementById('cleanScope').value = '';
+        document.getElementById('lineCount').value = '';
         document.getElementById('cleanArea').value = '';
+        document.getElementById('waterUsage').value = '';
         document.getElementById('cleaningAgent').value = '';
         document.getElementById('cleaningStaff').value = '';
         document.getElementById('remark').value = '';
