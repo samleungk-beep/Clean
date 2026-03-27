@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>清潔進度記錄表</title>
+    <title>大廈玻璃清洗進度記錄表</title>
     <style>
         * {
             box-sizing: border-box;
@@ -239,36 +239,36 @@
                 <input type="date" id="modalStartDate">
             </div>
             <div class="form-group">
-                <label>預計完成日期</label>
+                <label>完成日期</label>
                 <input type="date" id="modalEndDate">
             </div>
         </div>
 
         <div class="form-group">
-            <label>各方向街道名稱與面積</label>
+            <label>街道名稱與總面積</label>
             <div class="area-row">
                 <div>
-                    <label>北向街道名稱</label>
-                    <input type="text" id="modalStreetNorth" placeholder="例：中華路">
-                    <label>面積 (m²)</label>
+                    <label>北面街道名稱</label>
+                    <input type="text" id="modalStreetNorth" placeholder="例：Austin Road">
+                    <label>總面積 (m²)</label>
                     <input type="number" id="modalTotalNorth">
                 </div>
                 <div>
-                    <label>東向街道名稱</label>
-                    <input type="text" id="modalStreetEast" placeholder="例：民族路">
-                    <label>面積 (m²)</label>
+                    <label>東面街道名稱</label>
+                    <input type="text" id="modalStreetEast" placeholder="例：Austin Road">
+                    <label>總面積 (m²)</label>
                     <input type="number" id="modalTotalEast">
                 </div>
                 <div>
-                    <label>南向街道名稱</label>
-                    <input type="text" id="modalStreetSouth" placeholder="例：民生路">
-                    <label>面積 (m²)</label>
+                    <label>南面街道名稱</label>
+                    <input type="text" id="modalStreetSouth" placeholder="例：Austin Road">
+                    <label>總面積 (m²)</label>
                     <input type="number" id="modalTotalSouth">
                 </div>
                 <div>
-                    <label>西向街道名稱</label>
-                    <input type="text" id="modalStreetWest" placeholder="例：自由路">
-                    <label>面積 (m²)</label>
+                    <label>西面街道名稱</label>
+                    <input type="text" id="modalStreetWest" placeholder="例：Austin Road">
+                    <label>總面積 (m²)</label>
                     <input type="number" id="modalTotalWest">
                 </div>
             </div>
@@ -296,7 +296,7 @@
 
 <div id="mainContent">
     <div class="header">
-        <h1><i class="fas fa-building"></i> 清潔進度記錄表</h1>
+        <h1><i class="fas fa-building"></i> 大廈玻璃清洗進度記錄表</h1>
         <div class="project-info">
             <span id="current-project">項目：未設定</span>｜
             <span id="total-area">總面積：0 m²</span>｜
@@ -304,7 +304,14 @@
             <span id="project-date-info" style="margin-top:5px;display:inline-block;"></span>
         </div>
         
-        <div class="sync-buttons">
+        <div class="sync-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top:10px;
+            flex-wrap:wrap;
+        }
+        .sync-buttons">
             <button class="btn btn-primary" onclick="exportBackup()">📥 匯出備份</button>
             <button class="btn btn-primary" onclick="document.getElementById('backupFile').click()">📤 匯入備份</button>
             <input type="file" id="backupFile" accept=".json" onchange="importBackup(event)">
@@ -358,12 +365,12 @@
                 
                 <div class="direction-area-row">
                     <div class="form-group">
-                        <label>清潔街道</label>
+                        <label>面向街道</label>
                         <select id="direction">
-                            <option value="north">北向</option>
-                            <option value="east">東向</option>
-                            <option value="south">南向</option>
-                            <option value="west">西向</option>
+                            <option value="north">北面</option>
+                            <option value="east">東面</option>
+                            <option value="south">南面</option>
+                            <option value="west">西面</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -385,7 +392,7 @@
                 <div class="table-container">
                     <table><thead><tr>
                         <th>日期</th>
-                        <th>清潔街道</th>
+                        <th>面向街道</th>
                         <th>清洗面積</th>
                         <th>清潔劑</th>
                         <th>負責人</th>
@@ -630,10 +637,10 @@
         // 更新下拉選單顯示街道名
         const sel = document.getElementById('direction');
         sel.innerHTML = `
-            <option value="north">${projectSettings.streetNorth || '北向'}</option>
-            <option value="east">${projectSettings.streetEast || '東向'}</option>
-            <option value="south">${projectSettings.streetSouth || '南向'}</option>
-            <option value="west">${projectSettings.streetWest || '西向'}</option>
+            <option value="north">${projectSettings.streetNorth || '北面'}</option>
+            <option value="east">${projectSettings.streetEast || '東面'}</option>
+            <option value="south">${projectSettings.streetSouth || '南面'}</option>
+            <option value="west">${projectSettings.streetWest || '西面'}</option>
         `;
 
         const total = (+projectSettings.totalAreas.north + +projectSettings.totalAreas.east +
@@ -648,7 +655,7 @@
         
         let dateText = '';
         if (projectSettings.startDate) dateText += `開始：${projectSettings.startDate}　`;
-        if (projectSettings.endDate) dateText += `預計完成：${projectSettings.endDate}`;
+        if (projectSettings.endDate) dateText += `完成日期：${projectSettings.endDate}`;
         document.getElementById('project-date-info').innerText = dateText;
 
         document.getElementById('completedArea').textContent = done+' m²';
@@ -659,10 +666,10 @@
         body.innerHTML = '';
         cleaningRecords.sort((a, b) => new Date(b.date) - new Date(a.date)).forEach(r => {
             let streetName = '';
-            if (r.direction === 'north') streetName = projectSettings.streetNorth || '北向';
-            if (r.direction === 'east')  streetName = projectSettings.streetEast  || '東向';
-            if (r.direction === 'south') streetName = projectSettings.streetSouth || '南向';
-            if (r.direction === 'west')  streetName = projectSettings.streetWest  || '西向';
+            if (r.direction === 'north') streetName = projectSettings.streetNorth || '北面';
+            if (r.direction === 'east')  streetName = projectSettings.streetEast  || '東面';
+            if (r.direction === 'south') streetName = projectSettings.streetSouth || '南面';
+            if (r.direction === 'west')  streetName = projectSettings.streetWest  || '西面';
             
             body.innerHTML += `<tr>
                 <td>${r.date}</td>
