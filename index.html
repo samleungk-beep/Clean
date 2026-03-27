@@ -152,7 +152,7 @@
         table {
             width: 100%;
             border-collapse: collapse;
-            min-width: 1100px;
+            min-width: 1300px;
         }
         th {
             background-color: #2c6eec;
@@ -245,9 +245,17 @@
         }
         .remark-modal .modal-content,
         .worktime-modal .modal-content {
-            max-width: 500px;
+            max-width: 700px;
             white-space: pre-wrap;
             word-wrap: break-word;
+        }
+        .remark-image {
+            max-width: 100%;
+            max-height: 400px;
+            margin-top: 15px;
+            border-radius: 6px;
+            object-fit: contain;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -318,10 +326,11 @@
 <div class="modal-overlay remark-modal" id="remarkModal">
     <div class="modal-content">
         <div class="modal-header">
-            <h3>備註內容</h3>
+            <h3>備註 & 示例圖</h3>
             <button class="modal-close" onclick="closeRemarkModal()">&times;</button>
         </div>
-        <div id="remarkContent" style="padding:10px; min-height:100px; white-space:pre-wrap;"></div>
+        <div id="remarkContent" style="padding:10px; min-height:60px; white-space:pre-wrap;"></div>
+        <img id="remarkImage" class="remark-image" style="display:none;">
         <div class="modal-footer">
             <button class="btn btn-primary" onclick="closeRemarkModal()">關閉</button>
         </div>
@@ -422,6 +431,7 @@
                         <th onclick="sortRecords(3)">清洗面積</th>
                         <th onclick="sortRecords(8)">用水量(ml)</th>
                         <th onclick="sortRecords(4)">清潔劑(ml)</th>
+                        <th onclick="sortRecords(9)">操作員</th>
                         <th onclick="sortRecords(5)">負責人</th>
                         <th>備註</th>
                         <th>操作</th>
@@ -527,7 +537,24 @@
             </div>
         </div>
 
-        <div class="form-group"><label>負責人</label><input type="text" id="cleaningStaff"></div>
+        <!-- 操作員、負責人 同一行 -->
+        <div class="direction-area-row">
+            <div class="form-group">
+                <label>操作員</label>
+                <input type="text" id="operator" placeholder="輸入操作員">
+            </div>
+            <div class="form-group">
+                <label>負責人</label>
+                <input type="text" id="cleaningStaff" placeholder="輸入負責人">
+            </div>
+        </div>
+
+        <!-- 示例圖 -->
+        <div class="form-group">
+            <label>示例圖</label>
+            <input type="file" id="exampleImage" accept="image/*">
+        </div>
+
         <div class="form-group"><label>備註</label><textarea id="remark" rows="3"></textarea></div>
         <button class="btn btn-primary" onclick="addCleaningRecord()">新增記錄</button>
     </div>
@@ -550,9 +577,16 @@
         if (currentProjectId) loadProject(currentProjectId);
     }
 
-    // 備註彈窗
-    function showRemarkModal(text) {
+    // 備註彈窗（含圖片）
+    function showRemarkModal(text, imageBase64) {
         document.getElementById('remarkContent').innerText = text || '無備註';
+        const img = document.getElementById('remarkImage');
+        if (imageBase64) {
+            img.src = imageBase64;
+            img.style.display = 'block';
+        } else {
+            img.style.display = 'none';
+        }
         document.getElementById('remarkModal').style.display = 'flex';
     }
     function closeRemarkModal() {
@@ -861,10 +895,11 @@
                 case 6: valA = (a.cleanScope || "").toLowerCase(); valB = (b.cleanScope || "").toLowerCase(); break;
                 case 7: valA = parseFloat(a.lineCount) || 0; valB = parseFloat(b.lineCount) || 0; break;
                 case 8: valA = parseFloat(a.waterUsage) || 0; valB = parseFloat(b.waterUsage) || 0; break;
+                case 9: valA = (a.operator || "").toLowerCase(); valB = (b.operator || "").toLowerCase(); break;
                 default: return 0;
             }
             if (valA < valB) return recordSortAsc ? -1 : 1;
-            if (valA > valB) return recordSortAsc ? 1 : -1;
+            if (valA > valB) return projectSortAsc ? 1 : -1;
             return 0;
         });
 
@@ -890,7 +925,7 @@
             if (r.direction === 'south') streetName = projectSettings.streetSouth || '南面';
             if (r.direction === 'west')  streetName = projectSettings.streetWest  || '西面';
             
-            const rowText = `${r.date} ${streetName} ${r.timeSlot||""} ${r.cleanScope||""} ${r.lineCount||""} ${r.cleanArea} ${r.waterUsage||""} ${r.cleaningAgent} ${r.staff||""} ${r.remark||""}`.toLowerCase();
+            const rowText = `${r.date} ${streetName} ${r.timeSlot||""} ${r.cleanScope||""} ${r.lineCount||""} ${r.cleanArea} ${r.waterUsage||""} ${r.cleaningAgent} ${r.operator||""} ${r.staff||""} ${r.remark||""}`.toLowerCase();
             if (f && !rowText.includes(f)) return;
             
             body.innerHTML += `<tr>
@@ -907,15 +942,27 @@
                 <td>${r.cleanArea.toFixed(1)}</td>
                 <td>${r.waterUsage ? r.waterUsage.toFixed(1) : '-'}</td>
                 <td>${r.cleaningAgent.toFixed(1)}</td>
-                <td>${r.staff||'-'}</td>
-                <td><button class="btn btn-primary btn-sm" onclick="showRemarkModal(\`${r.remark||''}\`)">查看</button></td>
+                <td>${r.operator || '-'}</td>
+                <td>${r.staff || '-'}</td>
+                <td><button class="btn btn-primary btn-sm" onclick="showRemarkModal(\`${r.remark||''}\`, \`${r.image||''}\`)">查看</button></td>
                 <td><button class="btn btn-danger btn-sm" onclick="del(${index})">刪</button></td>
             </tr>`;
         });
     }
 
-    // 新增記錄
-    function addCleaningRecord() {
+    // 圖片上傳轉Base64
+    function getImageBase64(fileInput) {
+        return new Promise((resolve) => {
+            const file = fileInput.files[0];
+            if (!file) { resolve(''); return; }
+            const reader = new FileReader();
+            reader.onload = e => resolve(e.target.result);
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // 新增記錄（含圖片 & 操作員）
+    async function addCleaningRecord() {
         if (!currentProjectId || !allProjects[currentProjectId]) {
             alert("請先點選表格中的工程！");
             return;
@@ -929,17 +976,18 @@
         const cleanArea = +document.getElementById('cleanArea').value || 0;
         const workTime = collectWorkTime();
         
-        // 新增三個字段
         const cleanScope = document.getElementById('cleanScope').value.trim();
         const lineCount = +document.getElementById('lineCount').value || 0;
         const waterUsage = +document.getElementById('waterUsage').value || 0;
+        const operator = document.getElementById('operator').value.trim();
+        const image = await getImageBase64(document.getElementById('exampleImage'));
 
         const newRecord = {
             date, direction, timeSlot, cleanArea, workTime,
             cleaningAgent: +document.getElementById('cleaningAgent').value || 0,
             staff: document.getElementById('cleaningStaff').value,
             remark: document.getElementById('remark').value,
-            cleanScope, lineCount, waterUsage
+            cleanScope, lineCount, waterUsage, operator, image
         };
 
         let project = allProjects[currentProjectId];
@@ -948,16 +996,19 @@
 
         localStorage.setItem('allProjects', JSON.stringify(allProjects));
 
-        // 清空輸入框
+        // 清空
         document.getElementById('cleanScope').value = '';
         document.getElementById('lineCount').value = '';
         document.getElementById('cleanArea').value = '';
         document.getElementById('waterUsage').value = '';
         document.getElementById('cleaningAgent').value = '';
+        document.getElementById('operator').value = '';
         document.getElementById('cleaningStaff').value = '';
         document.getElementById('remark').value = '';
+        document.getElementById('exampleImage').value = '';
 
         render();
+        alert('新增記錄成功！');
     }
 
     // 刪除記錄
