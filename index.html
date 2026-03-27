@@ -269,15 +269,15 @@
 
     <div class="card">
         <div class="card-header"><h2><i class="fas fa-folder-open"></i> 工程管理</h2></div>
-        
-        <!-- 🔥 已簡化：只留三個按鈕，順序：編輯、新增、刪除 -->
-        <div style="display:flex; gap:10px; justify-content:flex-start;">
-            <button class="btn btn-primary" onclick="openEditProjectModal()">編輯設定</button>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <input type="text" id="newProjectName" placeholder="新工程名稱" style="flex:1;min-width:200px;">
             <button class="btn btn-primary" onclick="openNewProjectModal()">新增工程</button>
+            <select id="currentProjectSelect" onchange="switchProject()" style="flex:1;min-width:200px;"></select>
             <button class="btn btn-danger" onclick="deleteCurrentProject()">刪除工程</button>
+            <button class="btn btn-primary" onclick="openEditProjectModal()" style="margin-left:auto;">編輯設定</button>
         </div>
 
-        <!-- 工程一覽表 -->
+        <!-- 🔥 新增：工程一覽表 -->
         <div class="table-container" style="margin-top:20px;">
             <table class="project-table">
                 <thead>
@@ -440,7 +440,11 @@
         alert('儲存成功');
     }
 
-    // 切換工程（點表格觸發）
+    // 切換工程
+    function switchProject() {
+        switchProjectId(document.getElementById('currentProjectSelect').value);
+    }
+
     function switchProjectId(id) {
         currentProjectId = id;
         localStorage.setItem('currentProjectId', id);
@@ -458,14 +462,13 @@
     // 刪除工程
     function deleteCurrentProject() {
         if (!currentProjectId) return;
-        if(!confirm('確定要刪除此工程嗎？所有記錄將一併刪除！')) return;
         delete allProjects[currentProjectId];
         currentProjectId = null;
         localStorage.setItem('allProjects', JSON.stringify(allProjects));
         render();
     }
 
-    // 渲染工程一覽表
+    // 🔥 新增：渲染工程一覽表
     function renderProjectTable() {
         const tbody = document.getElementById('projectTableBody');
         tbody.innerHTML = '';
@@ -495,10 +498,19 @@
         });
     }
 
+    // 初始化下拉與列表
+    function initProjectListAndSelect() {
+        const sel = document.getElementById('currentProjectSelect');
+        sel.innerHTML = '<option value="">請選擇工程</option>';
+        Object.entries(allProjects).forEach(([id, p]) => {
+            sel.innerHTML += `<option value="${id}" ${id == currentProjectId ? 'selected' : ''}>${p.name}</option>`;
+        });
+    }
+
     // 新增記錄
     function addCleaningRecord() {
         if (!currentProjectId || !allProjects[currentProjectId]) {
-            alert("請先點選表格中的工程！");
+            alert("請先選擇一個工程！");
             return;
         }
 
@@ -543,7 +555,8 @@
 
     // 主渲染
     function render() {
-        renderProjectTable();
+        initProjectListAndSelect();
+        renderProjectTable(); // 🔥 工程表一併更新
         if (!projectSettings) return;
         
         const total = (+projectSettings.totalAreas.north + +projectSettings.totalAreas.east +
