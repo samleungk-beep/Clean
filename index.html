@@ -79,7 +79,7 @@
             border-radius: 5px;
             font-size: 1em;
         }
-        .area-inputs {
+        .area-row {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 10px;
@@ -171,7 +171,7 @@
         }
         #backupFile{display:none;}
 
-        /* 彈窗樣式 */
+        /* 彈窗 */
         .modal-overlay {
             position: fixed;
             top: 0; left: 0;
@@ -210,7 +210,6 @@
             gap: 10px;
             margin-top: 20px;
         }
-        /* 備註彈窗 */
         .remark-modal .modal-content {
             max-width: 500px;
             white-space: pre-wrap;
@@ -222,7 +221,7 @@
 </head>
 <body>
 
-<!-- 項目設定彈窗 -->
+<!-- 工程設定彈窗 -->
 <div class="modal-overlay" id="projectModal">
     <div class="modal-content">
         <div class="modal-header">
@@ -246,21 +245,42 @@
         </div>
 
         <div class="form-group">
-            <label>總面積 (m²)</label>
-            <div class="area-inputs">
-                <div><label>北向</label><input type="number" id="modalTotalNorth"></div>
-                <div><label>東向</label><input type="number" id="modalTotalEast"></div>
-                <div><label>南向</label><input type="number" id="modalTotalSouth"></div>
-                <div><label>西向</label><input type="number" id="modalTotalWest"></div>
+            <label>各方向街道名稱與面積</label>
+            <div class="area-row">
+                <div>
+                    <label>北向街道名稱</label>
+                    <input type="text" id="modalStreetNorth" placeholder="例：中華路">
+                    <label>面積 (m²)</label>
+                    <input type="number" id="modalTotalNorth">
+                </div>
+                <div>
+                    <label>東向街道名稱</label>
+                    <input type="text" id="modalStreetEast" placeholder="例：民族路">
+                    <label>面積 (m²)</label>
+                    <input type="number" id="modalTotalEast">
+                </div>
+                <div>
+                    <label>南向街道名稱</label>
+                    <input type="text" id="modalStreetSouth" placeholder="例：民生路">
+                    <label>面積 (m²)</label>
+                    <input type="number" id="modalTotalSouth">
+                </div>
+                <div>
+                    <label>西向街道名稱</label>
+                    <input type="text" id="modalStreetWest" placeholder="例：自由路">
+                    <label>面積 (m²)</label>
+                    <input type="number" id="modalTotalWest">
+                </div>
             </div>
         </div>
+
         <div class="modal-footer">
             <button class="btn btn-primary" onclick="saveProjectFromModal()">儲存設定</button>
         </div>
     </div>
 </div>
 
-<!-- 備註查看彈窗 -->
+<!-- 備註彈窗 -->
 <div class="modal-overlay remark-modal" id="remarkModal">
     <div class="modal-content">
         <div class="modal-header">
@@ -338,7 +358,7 @@
                 
                 <div class="direction-area-row">
                     <div class="form-group">
-                        <label>方向</label>
+                        <label>清潔街道</label>
                         <select id="direction">
                             <option value="north">北向</option>
                             <option value="east">東向</option>
@@ -365,7 +385,7 @@
                 <div class="table-container">
                     <table><thead><tr>
                         <th>日期</th>
-                        <th>面向街道</th>
+                        <th>清潔街道</th>
                         <th>清洗面積</th>
                         <th>清潔劑</th>
                         <th>負責人</th>
@@ -408,10 +428,17 @@
         document.getElementById('modalProjectName').value = '';
         document.getElementById('modalStartDate').value = '';
         document.getElementById('modalEndDate').value = '';
+        
+        document.getElementById('modalStreetNorth').value = '';
+        document.getElementById('modalStreetEast').value = '';
+        document.getElementById('modalStreetSouth').value = '';
+        document.getElementById('modalStreetWest').value = '';
+        
         document.getElementById('modalTotalNorth').value = 0;
         document.getElementById('modalTotalEast').value = 0;
         document.getElementById('modalTotalSouth').value = 0;
         document.getElementById('modalTotalWest').value = 0;
+        
         document.getElementById('projectModal').style.display = 'flex';
     }
 
@@ -419,13 +446,22 @@
         if (!currentProjectId) { alert('請先選擇一個工程'); return; }
         isEditMode = true;
         const pj = allProjects[currentProjectId];
-        document.getElementById('modalProjectName').value = pj.settings.name;
-        document.getElementById('modalStartDate').value = pj.settings.startDate || '';
-        document.getElementById('modalEndDate').value = pj.settings.endDate || '';
-        document.getElementById('modalTotalNorth').value = pj.settings.totalAreas.north;
-        document.getElementById('modalTotalEast').value = pj.settings.totalAreas.east;
-        document.getElementById('modalTotalSouth').value = pj.settings.totalAreas.south;
-        document.getElementById('modalTotalWest').value = pj.settings.totalAreas.west;
+        const s = pj.settings;
+        
+        document.getElementById('modalProjectName').value = s.name;
+        document.getElementById('modalStartDate').value = s.startDate || '';
+        document.getElementById('modalEndDate').value = s.endDate || '';
+        
+        document.getElementById('modalStreetNorth').value = s.streetNorth || '';
+        document.getElementById('modalStreetEast').value = s.streetEast || '';
+        document.getElementById('modalStreetSouth').value = s.streetSouth || '';
+        document.getElementById('modalStreetWest').value = s.streetWest || '';
+        
+        document.getElementById('modalTotalNorth').value = s.totalAreas.north;
+        document.getElementById('modalTotalEast').value = s.totalAreas.east;
+        document.getElementById('modalTotalSouth').value = s.totalAreas.south;
+        document.getElementById('modalTotalWest').value = s.totalAreas.west;
+        
         document.getElementById('projectModal').style.display = 'flex';
     }
 
@@ -433,13 +469,18 @@
         document.getElementById('projectModal').style.display = 'none';
     }
 
-    // 儲存工程
+    // 儲存工程（包含街道名）
     function saveProjectFromModal() {
         const name = document.getElementById('modalProjectName').value.trim();
         if (!name) { alert('請輸入項目名稱'); return; }
         
         const startDate = document.getElementById('modalStartDate').value;
         const endDate = document.getElementById('modalEndDate').value;
+
+        const streetNorth = document.getElementById('modalStreetNorth').value.trim();
+        const streetEast = document.getElementById('modalStreetEast').value.trim();
+        const streetSouth = document.getElementById('modalStreetSouth').value.trim();
+        const streetWest = document.getElementById('modalStreetWest').value.trim();
 
         const totalAreas = {
             north: Number(document.getElementById('modalTotalNorth').value) || 0,
@@ -449,17 +490,26 @@
         };
 
         if (isEditMode) {
-            allProjects[currentProjectId].settings.name = name;
-            allProjects[currentProjectId].settings.startDate = startDate;
-            allProjects[currentProjectId].settings.endDate = endDate;
-            allProjects[currentProjectId].settings.totalAreas = totalAreas;
+            let pj = allProjects[currentProjectId];
+            pj.settings.name = name;
+            pj.settings.startDate = startDate;
+            pj.settings.endDate = endDate;
+            pj.settings.streetNorth = streetNorth;
+            pj.settings.streetEast = streetEast;
+            pj.settings.streetSouth = streetSouth;
+            pj.settings.streetWest = streetWest;
+            pj.settings.totalAreas = totalAreas;
             localStorage.setItem('allProjects', JSON.stringify(allProjects));
             loadProject(currentProjectId);
         } else {
             const id = Date.now().toString();
             allProjects[id] = { 
                 name, 
-                settings: { name, startDate, endDate, totalAreas }, 
+                settings: { 
+                    name, startDate, endDate,
+                    streetNorth, streetEast, streetSouth, streetWest,
+                    totalAreas
+                }, 
                 records: [] 
             };
             localStorage.setItem('allProjects', JSON.stringify(allProjects));
@@ -509,7 +559,7 @@
             const totalWest = s.totalAreas.west;
             const totalArea = totalNorth + totalEast + totalSouth + totalWest;
             const doneArea = pj.records.reduce((sum, r) => sum + r.cleanArea, 0);
-            const rate = totalArea > 0 ? ((doneArea / totalArea) * 100).toFixed(1) + '%' : '0%';
+            const rate = totalArea > 0 ? ((doneArea / totalArea)*100).toFixed(1) + '%' : '0%';
 
             tbody.innerHTML += `
             <tr class="${id === currentProjectId ? 'active' : ''}" onclick="switchProjectId('${id}')">
@@ -577,10 +627,19 @@
         renderProjectTable();
         if (!projectSettings) return;
         
+        // 更新下拉選單顯示街道名
+        const sel = document.getElementById('direction');
+        sel.innerHTML = `
+            <option value="north">${projectSettings.streetNorth || '北向'}</option>
+            <option value="east">${projectSettings.streetEast || '東向'}</option>
+            <option value="south">${projectSettings.streetSouth || '南向'}</option>
+            <option value="west">${projectSettings.streetWest || '西向'}</option>
+        `;
+
         const total = (+projectSettings.totalAreas.north + +projectSettings.totalAreas.east +
                        +projectSettings.totalAreas.south + +projectSettings.totalAreas.west).toFixed(1);
         const done = cleaningRecords.reduce((s, r) => s + r.cleanArea, 0).toFixed(1);
-        const rate = total > 0 ? ((done / total) * 100).toFixed(1) : 0;
+        const rate = total > 0 ? ((done / total)*100).toFixed(1) : 0;
         const agent = cleaningRecords.reduce((s, r) => s + r.cleaningAgent, 0).toFixed(1);
         
         document.getElementById('current-project').textContent = `項目：${projectSettings.name||'未設定'}`;
@@ -599,10 +658,15 @@
         const body = document.getElementById('recordsTableBody');
         body.innerHTML = '';
         cleaningRecords.sort((a, b) => new Date(b.date) - new Date(a.date)).forEach(r => {
-            const dirName = { north:'北向', east:'東向', south:'南向', west:'西向' }[r.direction];
+            let streetName = '';
+            if (r.direction === 'north') streetName = projectSettings.streetNorth || '北向';
+            if (r.direction === 'east')  streetName = projectSettings.streetEast  || '東向';
+            if (r.direction === 'south') streetName = projectSettings.streetSouth || '南向';
+            if (r.direction === 'west')  streetName = projectSettings.streetWest  || '西向';
+            
             body.innerHTML += `<tr>
                 <td>${r.date}</td>
-                <td>${dirName}</td>
+                <td>${streetName}</td>
                 <td>${r.cleanArea.toFixed(1)}</td>
                 <td>${r.cleaningAgent.toFixed(1)}</td>
                 <td>${r.staff||'-'}</td>
@@ -623,7 +687,7 @@
             type: 'doughnut',
             data: {
                 labels: ['已完成', '剩餘'],
-                datasets: [{ data: [done, Math.max(0, total - done)], backgroundColor: ['#2c6eec', '#e0e0e0'] }]
+                datasets: [{ data: [done, Math.max(0, total-done)], backgroundColor: ['#2c6eec','#e0e0e0'] }]
             },
             options: { cutout: '60%' }
         });
@@ -632,7 +696,7 @@
     // 備份 / 還原
     function exportBackup() {
         const data = JSON.stringify({ allProjects, currentProjectId });
-        const blob = new Blob([data], { type: "application/json" });
+        const blob = new Blob([data],{type:"application/json"});
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -646,16 +710,16 @@
         const file = e.target.files[0];
         if (!file) return;
         const reader = new FileReader();
-        reader.onload = ev => {
-            try {
+        reader.onload = ev=>{
+            try{
                 const data = JSON.parse(ev.target.result);
                 allProjects = data.allProjects;
                 currentProjectId = data.currentProjectId;
-                localStorage.setItem('allProjects', JSON.stringify(allProjects));
-                localStorage.setItem('currentProjectId', currentProjectId);
+                localStorage.setItem('allProjects',JSON.stringify(allProjects));
+                localStorage.setItem('currentProjectId',currentProjectId);
                 init();
                 alert('匯入成功！');
-            } catch (e) { alert('檔案錯誤') }
+            }catch(e){alert('檔案錯誤')}
         };
         reader.readAsText(file);
     }
