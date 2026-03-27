@@ -101,6 +101,16 @@
         .direction-area-row .form-group {
             flex: 1;
         }
+        .time-pair-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+        .time-pair-row select {
+            padding: 8px;
+        }
         .btn {
             padding: 6px 12px;
             border: none;
@@ -218,7 +228,8 @@
             gap: 10px;
             margin-top: 20px;
         }
-        .remark-modal .modal-content {
+        .remark-modal .modal-content,
+        .worktime-modal .modal-content {
             max-width: 500px;
             white-space: pre-wrap;
             word-wrap: break-word;
@@ -298,6 +309,20 @@
         <div id="remarkContent" style="padding:10px; min-height:100px; white-space:pre-wrap;"></div>
         <div class="modal-footer">
             <button class="btn btn-primary" onclick="closeRemarkModal()">關閉</button>
+        </div>
+    </div>
+</div>
+
+<!-- 運作時間彈窗 -->
+<div class="modal-overlay worktime-modal" id="worktimeModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>運作時間</h3>
+            <button class="modal-close" onclick="closeWorktimeModal()">&times;</button>
+        </div>
+        <div id="worktimeContent" style="padding:10px; min-height:100px; white-space:pre-wrap;"></div>
+        <div class="modal-footer">
+            <button class="btn btn-primary" onclick="closeWorktimeModal()">關閉</button>
         </div>
     </div>
 </div>
@@ -411,10 +436,49 @@
                 <select id="timeSlot">
                     <option value="上午">上午</option>
                     <option value="下午">下午</option>
-                    <option value="晚上">晚上</option>
-                    <option value="其他">其他</option>
+                    <option value="整天">整天</option>
                 </select>
             </div>
+        </div>
+
+        <!-- 運作時間 -->
+        <div class="form-group">
+            <label>運作時間 (精確到分鐘)</label>
+            <div id="timePairsContainer">
+                <div class="time-pair-row">
+                    <select class="hour-start">
+                        <option value="12">12</option><option value="1">1</option><option value="2">2</option><option value="3">3</option>
+                        <option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option>
+                        <option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option>
+                    </select>
+                    <span>:</span>
+                    <select class="min-start">
+                        <option value="00">00</option><option value="05">05</option><option value="10">10</option><option value="15">15</option>
+                        <option value="20">20</option><option value="25">25</option><option value="30">30</option><option value="35">35</option>
+                        <option value="40">40</option><option value="45">45</option><option value="50">50</option><option value="55">55</option>
+                    </select>
+                    <select class="ampm-start">
+                        <option value="a.m.">a.m.</option><option value="p.m.">p.m.</option>
+                    </select>
+                    <span>至</span>
+                    <select class="hour-end">
+                        <option value="12">12</option><option value="1">1</option><option value="2">2</option><option value="3">3</option>
+                        <option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option>
+                        <option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option>
+                    </select>
+                    <span>:</span>
+                    <select class="min-end">
+                        <option value="00">00</option><option value="05">05</option><option value="10">10</option><option value="15">15</option>
+                        <option value="20">20</option><option value="25">25</option><option value="30">30</option><option value="35">35</option>
+                        <option value="40">40</option><option value="45">45</option><option value="50">50</option><option value="55">55</option>
+                    </select>
+                    <select class="ampm-end">
+                        <option value="a.m.">a.m.</option><option value="p.m.">p.m.</option>
+                    </select>
+                    <button type="button" class="btn btn-sm btn-danger" onclick="removeTimePair(this)">刪除</button>
+                </div>
+            </div>
+            <button type="button" class="btn btn-sm btn-primary" onclick="addTimePair()" style="margin-top:6px;">+ 新增時間段</button>
         </div>
 
         <div class="form-group"><label>清洗面積 (m²)</label><input type="number" id="cleanArea" placeholder="可留空或輸入0"></div>
@@ -449,6 +513,81 @@
     }
     function closeRemarkModal() {
         document.getElementById('remarkModal').style.display = 'none';
+    }
+
+    // 運作時間彈窗
+    function showWorktimeModal(text) {
+        document.getElementById('worktimeContent').innerText = text || '無運作時間';
+        document.getElementById('worktimeModal').style.display = 'flex';
+    }
+    function closeWorktimeModal() {
+        document.getElementById('worktimeModal').style.display = 'none';
+    }
+
+    // 新增運作時間組 (含分鐘)
+    function addTimePair() {
+        const container = document.getElementById('timePairsContainer');
+        const div = document.createElement('div');
+        div.className = 'time-pair-row';
+        div.innerHTML = `
+            <select class="hour-start">
+                <option value="12">12</option><option value="1">1</option><option value="2">2</option><option value="3">3</option>
+                <option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option>
+                <option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option>
+            </select>
+            <span>:</span>
+            <select class="min-start">
+                <option value="00">00</option><option value="05">05</option><option value="10">10</option><option value="15">15</option>
+                <option value="20">20</option><option value="25">25</option><option value="30">30</option><option value="35">35</option>
+                <option value="40">40</option><option value="45">45</option><option value="50">50</option><option value="55">55</option>
+            </select>
+            <select class="ampm-start">
+                <option value="a.m.">a.m.</option><option value="p.m.">p.m.</option>
+            </select>
+            <span>至</span>
+            <select class="hour-end">
+                <option value="12">12</option><option value="1">1</option><option value="2">2</option><option value="3">3</option>
+                <option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option>
+                <option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option>
+            </select>
+            <span>:</span>
+            <select class="min-end">
+                <option value="00">00</option><option value="05">05</option><option value="10">10</option><option value="15">15</option>
+                <option value="20">20</option><option value="25">25</option><option value="30">30</option><option value="35">35</option>
+                <option value="40">40</option><option value="45">45</option><option value="50">50</option><option value="55">55</option>
+            </select>
+            <select class="ampm-end">
+                <option value="a.m.">a.m.</option><option value="p.m.">p.m.</option>
+            </select>
+            <button type="button" class="btn btn-sm btn-danger" onclick="removeTimePair(this)">刪除</button>
+        `;
+        container.appendChild(div);
+    }
+
+    // 刪除時間段
+    function removeTimePair(btn) {
+        const rows = document.querySelectorAll('.time-pair-row');
+        if (rows.length <= 1) {
+            alert('至少保留一個時間段');
+            return;
+        }
+        btn.parentElement.remove();
+    }
+
+    // 收集所有運作時間 (含分鐘)
+    function collectWorkTime() {
+        const pairs = document.querySelectorAll('.time-pair-row');
+        const list = [];
+        pairs.forEach(p => {
+            const h1 = p.querySelector('.hour-start').value;
+            const m1 = p.querySelector('.min-start').value;
+            const ap1 = p.querySelector('.ampm-start').value;
+            const h2 = p.querySelector('.hour-end').value;
+            const m2 = p.querySelector('.min-end').value;
+            const ap2 = p.querySelector('.ampm-end').value;
+            list.push(`${h1}:${m1} ${ap1} 至 ${h2}:${m2} ${ap2}`);
+        });
+        return list.join('； ');
     }
 
     // 工程彈窗
@@ -689,7 +828,7 @@
         filterRecords();
     }
 
-    // 記錄篩選
+    // 修復：記錄篩選功能
     function filterRecords() {
         const f = document.getElementById('recordFilter').value.toLowerCase();
         const body = document.getElementById('recordsTableBody');
@@ -710,7 +849,12 @@
             body.innerHTML += `<tr>
                 <td>${r.date}</td>
                 <td>${streetName}</td>
-                <td>${r.timeSlot || '-'}</td>
+                <td>
+                    ${r.timeSlot || '-'}
+                    <button class="btn btn-sm btn-primary" onclick="showWorktimeModal(\`${r.workTime||''}\`)" style="margin-left:4px;">
+                        <i class="fas fa-clock"></i>
+                    </button>
+                </td>
                 <td>${r.cleanArea.toFixed(1)}</td>
                 <td>${r.cleaningAgent.toFixed(1)}</td>
                 <td>${r.staff||'-'}</td>
@@ -720,7 +864,7 @@
         });
     }
 
-    // 新增記錄（可輸入0或不輸入面積）
+    // 新增記錄
     function addCleaningRecord() {
         if (!currentProjectId || !allProjects[currentProjectId]) {
             alert("請先點選表格中的工程！");
@@ -733,9 +877,10 @@
         const direction = document.getElementById('direction').value;
         const timeSlot = document.getElementById('timeSlot').value;
         const cleanArea = +document.getElementById('cleanArea').value || 0;
+        const workTime = collectWorkTime();
 
         const newRecord = {
-            date, direction, timeSlot, cleanArea,
+            date, direction, timeSlot, cleanArea, workTime,
             cleaningAgent: +document.getElementById('cleaningAgent').value || 0,
             staff: document.getElementById('cleaningStaff').value,
             remark: document.getElementById('remark').value
