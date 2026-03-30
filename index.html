@@ -285,9 +285,9 @@
             justify-content: flex-start;
             align-items: center;
         }
-        /* 格子改成「寬 > 高」的直向長方形，讓文字有空間 */
+        /* 格子改成 70px × 28px */
         .grid-cell {
-            width: 60px;    /* 從50→60，給4個字母足夠空間 */
+            width: 70px;
             height: 28px;
             border: 2px solid #333;
             background: white;
@@ -315,6 +315,10 @@
             font-size: 14px;
             color: #2c6eec;
             flex-shrink: 0;
+            position: sticky;
+            left: 0;
+            background: #fff;
+            z-index: 10;
         }
         .col-label-row {
             display: flex;
@@ -326,7 +330,7 @@
         }
         /* 標籤也跟著變寬，確保 ABCD01 完整顯示 */
         .col-label {
-            width: 60px;    /* 從50→60，4個字母完全不重疊 */
+            width: 70px;
             height: 22px;
             display: flex;
             align-items: center;
