@@ -249,7 +249,9 @@
         }
         .remark-modal .modal-content,
         .worktime-modal .modal-content {
-            max-width: 700px;
+            max-width: 90vw;
+            width: auto;
+            min-width: 300px;
             white-space: pre-wrap;
             word-wrap: break-word;
         }
@@ -262,33 +264,52 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
 
-        /* 示意圖表樣式 */
+        /* 示意圖表樣式 —— 自適應優化 + 強制水平滾動 */
         .grid-canvas {
             margin: 15px 0;
             display: flex;
             flex-direction: column;
-            gap: 4px;
-            align-items: center;
+            gap: 2px;
+            align-items: flex-start; /* 關閉居中，改靠左，確保左側不消失 */
+            justify-content: flex-start;
+            width: 100%;
+            overflow-x: auto; /* 強制水平滾動 */
+            padding: 8px;
+            border: 1px solid #eee;
+            border-radius: 6px;
         }
         .grid-row {
             display: flex;
-            gap: 4px;
+            gap: 2px;
+            width: auto; /* 不自動縮小，保持原始寬度 */
+            justify-content: flex-start;
         }
         .grid-cell {
             width: 36px;
             height: 36px;
             border: 2px solid #333;
             background: white;
+            flex-shrink: 0;
         }
         .grid-cell.filled {
             background: #28a745;
             border-color: #19692c;
         }
+
+        /* 超大圖表自動縮小 */
+        .grid-auto-size .grid-cell {
+            width: 12px !important;
+            height: 12px !important;
+            border-width: 1px !important;
+        }
+
         #chartPreview {
             border: 1px solid #ddd;
             padding: 10px;
             border-radius: 6px;
             min-height: 120px;
+            max-width: 100%;
+            overflow-x: auto;
         }
         #previewGrid {
             margin-top: 10px;
@@ -308,6 +329,8 @@
             padding: 10px;
             border: 1px dashed #ccc;
             border-radius: 6px;
+            max-width: 100%;
+            overflow-x: auto;
         }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -406,7 +429,7 @@
 
 <!-- 示意圖表彈窗 -->
 <div class="modal-overlay" id="chartModal">
-    <div class="modal-content" style="max-width:700px;">
+    <div class="modal-content" style="max-width:90vw; width:auto;">
         <div class="modal-header">
             <h2><i class="fas fa-th"></i> 加入示意圖表</h2>
             <button class="modal-close" onclick="closeChartModal()">&times;</button>
@@ -691,6 +714,12 @@
             if (chartData) {
                 const div = document.createElement('div');
                 div.className = 'grid-canvas';
+                
+                // 超大圖表自動縮小
+                if(chartData.cols > 20 || chartData.rows > 15){
+                    div.classList.add('grid-auto-size');
+                }
+
                 for (let r = 0; r < chartData.rows; r++) {
                     const row = document.createElement('div');
                     row.className = 'grid-row';
@@ -739,7 +768,7 @@
         document.getElementById('chartModal').style.display = 'none';
     }
 
-    // 渲染方格圖表
+    // 渲染方格圖表 —— 自適應大尺寸
     function renderGrid() {
         const cols = parseInt(document.getElementById('gridCols').value) || 6;
         const rows = parseInt(document.getElementById('gridRows').value) || 1;
@@ -748,6 +777,13 @@
 
         const container = document.getElementById('previewGrid');
         container.innerHTML = '';
+
+        // 超大表格自動縮小
+        if(cols > 20 || rows > 15){
+            container.classList.add('grid-auto-size');
+        }else{
+            container.classList.remove('grid-auto-size');
+        }
 
         for (let r = 0; r < rows; r++) {
             const rowDiv = document.createElement('div');
@@ -775,6 +811,11 @@
         
         const canvas = document.createElement('div');
         canvas.className = 'grid-canvas';
+        
+        if(currentGridData.cols > 20 || currentGridData.rows > 15){
+            canvas.classList.add('grid-auto-size');
+        }
+
         for (let r = 0; r < currentGridData.rows; r++) {
             const row = document.createElement('div');
             row.className = 'grid-row';
