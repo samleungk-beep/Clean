@@ -264,16 +264,16 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
 
-        /* 示意圖表樣式 —— 自適應優化 + 強制水平滾動 */
+        /* 示意圖表樣式 —— 直向長方形，確保標籤完整顯示 */
         .grid-canvas {
             margin: 15px 0;
             display: flex;
             flex-direction: column;
             gap: 2px;
-            align-items: flex-start; /* 關閉居中，改靠左，確保左側不消失 */
+            align-items: flex-start;
             justify-content: flex-start;
             width: 100%;
-            overflow-x: auto; /* 強制水平滾動 */
+            overflow-x: auto;
             padding: 8px;
             border: 1px solid #eee;
             border-radius: 6px;
@@ -281,26 +281,87 @@
         .grid-row {
             display: flex;
             gap: 2px;
-            width: auto; /* 不自動縮小，保持原始寬度 */
+            width: auto;
             justify-content: flex-start;
+            align-items: center;
         }
+        /* 格子改成「寬 > 高」的直向長方形，讓文字有空間 */
         .grid-cell {
-            width: 36px;
-            height: 36px;
+            width: 60px;    /* 從50→60，給4個字母足夠空間 */
+            height: 28px;
             border: 2px solid #333;
             background: white;
             flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
         }
         .grid-cell.filled {
             background: #28a745;
             border-color: #19692c;
+            color: white;
+        }
+
+        /* 樓層&行數標籤 */
+        .floor-label {
+            width: 40px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 14px;
+            color: #2c6eec;
+            flex-shrink: 0;
+        }
+        .col-label-row {
+            display: flex;
+            gap: 2px;
+            width: auto;
+            justify-content: flex-start;
+            padding-left: 42px;
+            margin-bottom: 2px;
+        }
+        /* 標籤也跟著變寬，確保 ABCD01 完整顯示 */
+        .col-label {
+            width: 60px;    /* 從50→60，4個字母完全不重疊 */
+            height: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 11px;
+            color: #2c6eec;
+            flex-shrink: 0;
+            white-space: nowrap;
+            padding: 0;
+            overflow: visible; /* 不隱藏文字 */
+            text-overflow: unset;
         }
 
         /* 超大圖表自動縮小 */
         .grid-auto-size .grid-cell {
-            width: 12px !important;
-            height: 12px !important;
+            width: 26px !important;
+            height: 14px !important;
             border-width: 1px !important;
+            font-size: 7px !important;
+        }
+        .grid-auto-size .floor-label {
+            width: 18px !important;
+            height: 14px !important;
+            font-size: 7px !important;
+        }
+        .grid-auto-size .col-label {
+            width: 26px !important;
+            height: 12px !important;
+            font-size: 7px !important;
+            padding: 0 !important;
+            overflow: visible !important;
+        }
+        .grid-auto-size .col-label-row {
+            padding-left: 20px !important;
         }
 
         #chartPreview {
@@ -443,6 +504,10 @@
             <div class="form-group">
                 <label>層數（B）</label>
                 <input type="number" id="gridRows" min="1" value="1" oninput="renderGrid()">
+            </div>
+            <div class="form-group">
+                <label>街名代號</label>
+                <input type="text" id="streetCode" maxlength="4" placeholder="例：AR" oninput="renderGrid()">
             </div>
         </div>
 
@@ -712,28 +777,7 @@
         if (chartData) {
             try { chartData = JSON.parse(decodeURIComponent(chartData)); } catch (e) {}
             if (chartData) {
-                const div = document.createElement('div');
-                div.className = 'grid-canvas';
-                
-                // 超大圖表自動縮小
-                if(chartData.cols > 20 || chartData.rows > 15){
-                    div.classList.add('grid-auto-size');
-                }
-
-                for (let r = 0; r < chartData.rows; r++) {
-                    const row = document.createElement('div');
-                    row.className = 'grid-row';
-                    for (let c = 0; c < chartData.cols; c++) {
-                        const cell = document.createElement('div');
-                        cell.className = 'grid-cell';
-                        if (c+1 >= chartData.start && c+1 <= chartData.end) {
-                            cell.classList.add('filled');
-                        }
-                        row.appendChild(cell);
-                    }
-                    div.appendChild(row);
-                }
-                chartBox.appendChild(div);
+                chartBox.appendChild(renderFullGrid(chartData));
             }
         }
 
@@ -762,44 +806,77 @@
     // 示意圖表彈窗
     function openChartModal() {
         document.getElementById('chartModal').style.display = 'flex';
+        document.getElementById('streetCode').value = '';
         renderGrid();
     }
     function closeChartModal() {
         document.getElementById('chartModal').style.display = 'none';
     }
 
-    // 渲染方格圖表 —— 自適應大尺寸
-    function renderGrid() {
-        const cols = parseInt(document.getElementById('gridCols').value) || 6;
-        const rows = parseInt(document.getElementById('gridRows').value) || 1;
-        const start = parseInt(document.getElementById('rangeStart').value) || 1;
-        const end = parseInt(document.getElementById('rangeEnd').value) || cols;
+    // 數字補零 (1→01, 10→10)
+    function padNumber(num) {
+        return num.toString().padStart(2, '0');
+    }
 
-        const container = document.getElementById('previewGrid');
-        container.innerHTML = '';
-
+    // 渲染完整圖表（含樓層+行數標籤 + 街名代號）
+    function renderFullGrid(gridData) {
+        const { cols, rows, start, end, streetCode = '' } = gridData;
+        const container = document.createElement('div');
+        container.className = 'grid-canvas';
+        
         // 超大表格自動縮小
         if(cols > 20 || rows > 15){
             container.classList.add('grid-auto-size');
-        }else{
-            container.classList.remove('grid-auto-size');
         }
 
-        for (let r = 0; r < rows; r++) {
+        // 上側行數標籤（一定顯示街名代號 + 數字）
+        const colLabelRow = document.createElement('div');
+        colLabelRow.className = 'col-label-row';
+        for (let c = 1; c <= cols; c++) {
+            const label = document.createElement('div');
+            label.className = 'col-label';
+            const displayText = streetCode ? `${streetCode}${padNumber(c)}` : c.toString();
+            label.textContent = displayText;
+            colLabelRow.appendChild(label);
+        }
+        container.appendChild(colLabelRow);
+
+        // 樓層+格子
+        for (let r = rows; r >= 1; r--) {
             const rowDiv = document.createElement('div');
             rowDiv.className = 'grid-row';
-            for (let c = 0; c < cols; c++) {
+            
+            const floorLabel = document.createElement('div');
+            floorLabel.className = 'floor-label';
+            floorLabel.textContent = r;
+            rowDiv.appendChild(floorLabel);
+            
+            for (let c = 1; c <= cols; c++) {
                 const cell = document.createElement('div');
                 cell.className = 'grid-cell';
-                if (c+1 >= start && c+1 <= end) {
+                if (c >= start && c <= end) {
                     cell.classList.add('filled');
                 }
                 rowDiv.appendChild(cell);
             }
             container.appendChild(rowDiv);
         }
+        return container;
+    }
 
-        currentGridData = { cols, rows, start, end };
+    // 預覽圖表
+    function renderGrid() {
+        const cols = parseInt(document.getElementById('gridCols').value) || 6;
+        const rows = parseInt(document.getElementById('gridRows').value) || 1;
+        const start = parseInt(document.getElementById('rangeStart').value) || 1;
+        const end = parseInt(document.getElementById('rangeEnd').value) || cols;
+        const streetCode = document.getElementById('streetCode').value.trim();
+
+        const container = document.getElementById('previewGrid');
+        container.innerHTML = '';
+        
+        currentGridData = { cols, rows, start, end, streetCode };
+        container.appendChild(renderFullGrid(currentGridData));
     }
 
     // 儲存圖表到介面
@@ -808,28 +885,7 @@
         const target = document.getElementById('savedGridChart');
         target.style.display = 'block';
         target.innerHTML = `<label>示意圖表：</label>`;
-        
-        const canvas = document.createElement('div');
-        canvas.className = 'grid-canvas';
-        
-        if(currentGridData.cols > 20 || currentGridData.rows > 15){
-            canvas.classList.add('grid-auto-size');
-        }
-
-        for (let r = 0; r < currentGridData.rows; r++) {
-            const row = document.createElement('div');
-            row.className = 'grid-row';
-            for (let c = 0; c < currentGridData.cols; c++) {
-                const cell = document.createElement('div');
-                cell.className = 'grid-cell';
-                if (c+1 >= currentGridData.start && c+1 <= currentGridData.end) {
-                    cell.classList.add('filled');
-                }
-                row.appendChild(cell);
-            }
-            canvas.appendChild(row);
-        }
-        target.appendChild(canvas);
+        target.appendChild(renderFullGrid(currentGridData));
         closeChartModal();
     }
 
